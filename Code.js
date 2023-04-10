@@ -2,7 +2,7 @@ function buildGetModels(spreadsheetId, sheetName, startCol, endCol, hasHeader, b
   return function() {
     let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(sheetName);
-    let row = getLastRow(sheet, startCol);
+    let row = getLastRow_(sheet, startCol);
     let firstRow = hasHeader ? 2 : 1;
     if (firstRow > row) return [];
     let values = sheet.getRange(startCol+firstRow + ":" + endCol+(row)).getValues();
@@ -18,7 +18,7 @@ function buildFindModelByKey(spreadsheetId, sheetName, startCol, endCol, builder
   return function(key) {
     let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(sheetName);
-    let row = findKey(sheet, key, startCol);
+    let row = findKey_(sheet, key, startCol);
     let values = sheet.getRange(startCol+row + ":" + endCol+row).getValues();
     let model = builder(values[0], row);
     return model;
@@ -43,25 +43,24 @@ function buildSaveModel(spreadsheetId, sheetName, startCol, endCol, keyName, get
     let values = [getModelValues(model)];
 
     // check if we are processing rich text values or not
-    let isRichText = (values[0][0] && typeof values[0][0] === "object" && values[0][0].constructor.name == "Object");
-    let keyValue = isRichText ? values[0][0].getText() : values[0][0];
+    let keyValue = values[0][0].getText();
     
     // grab the document lock for read and write consistency
     let lock = LockService.getDocumentLock();
     lock.waitLock(10000);
 
     //if this requires a generated key and the key value isn't set, generate the key
-    keyValue = keyValue || !keyName ? keyValue : incrementKey(ss, keyName);
+    keyValue = keyValue || !keyName ? keyValue : incrementKey_(ss, keyName);
     model[keyName] = keyValue;
-    // convert the key back to a rich text value if necessary
-    values[0][0] = isRichText ? SpreadsheetApp.newRichTextValue().setText(keyValue).build() : keyValue;
+    // convert the key back to a rich text value
+    values[0][0] = getRichText_(keyValue);
 
     // try to find a record to update based on the key, otherwise we'll create a new record
     let row;
     try {
-      row = findKey(sheet, keyValue, startCol);
+      row = findKey_(sheet, keyValue, startCol);
     } catch (e) {
-      row = getFirstEmptyRow(sheet, startCol);
+      row = getFirstEmptyRow_(sheet, startCol);
     }
 
     if (model.row && model.row != row) {
@@ -69,12 +68,8 @@ function buildSaveModel(spreadsheetId, sheetName, startCol, endCol, keyName, get
     }
 
     // write the values for the record
-    if (isRichText) {
-      sheet.getRange(startCol+row + ":" + endCol+row).setRichTextValues(values);
-    } else {
-      sheet.getRange(startCol+row + ":" + endCol+row).setValues(values);
-    }
-
+    sheet.getRange(startCol+row + ":" + endCol+row).setRichTextValues(values);
+    
     // and we are done
     SpreadsheetApp.flush();
     lock.releaseLock();
@@ -92,10 +87,6 @@ function buildBulkInsertModels(spreadsheetId, sheetName, startCol, endCol, keyNa
     for (i in models) {
       values[i] = getModelValues(models[i]);
     }
-
-    // check if we are processing rich text values or not
-    //let isRichText = (typeof values[0][0] === "object" && values[0][0].constructor.name == "Object");
-    //let keyValue = isRichText ? values[0][0].getText() : values[0][0];
 
     // get the lock - we need to do this before any reads to guarantee both read and write consistency
     let lock = LockService.getDocumentLock();
@@ -121,13 +112,13 @@ function buildBulkInsertModels(spreadsheetId, sheetName, startCol, endCol, keyNa
     }
 
     // if we need to create the keys then create them here
-    let lastKey = incrementKey(ss, keyName, values.length);
+    let lastKey = incrementKey_(ss, keyName, values.length);
     for (let i in values) {
       values[i][0] = lastKey - values.length + i;
     }
     
     // we are good to progress so run the insert
-    let row = getFirstEmptyRow(sheet, startCol);
+    let row = getFirstEmptyRow_(sheet, startCol);
     sheet.getRange(startCol+row + ":" + endCol+(row+values.length-1)).setValues(values);
 
     // and we are done
@@ -144,34 +135,39 @@ function buildBuildModel(keys, enricher) {
   }
 }
 
-function buildGetModelValues(keys) {
+function buildGetModelValues(keys, richConverters) {
+  let safeConverters = richConverters ? richConverters : [];
+  for (let i in keys) safeConverters[i] = safeConverters[i] ? safeConverters[i] : getRichText_;
   return function(model) {
     let values = [];
-    for (let i in keys) values[i] = model[keys[i]];
+    for (let i in keys) values[i] = safeConverters[i](model[keys[i]]);
     return values;
   }
 }
 
-function buildGetRichModelValues(keys, richConverters) {
-  return function(model) {
-    let values = [];
-    for (let i in keys) values[i] = richConverters[i](model[keys[i]]);
-    return values;
-  }
+function findLastRow(spreadsheetId, sheetName, col) {
+  let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(sheetName);
+  return getLastRow_(sheet, col);
 }
 
 /**
  * Spreadsheet navigation
  */
-function getFirstEmptyRow(sheet, col) {
-  return findKey(sheet, "", col);
+function getFirstEmptyRow_(sheet, col) {
+  return findKey_(sheet, "", col);
 }
 
-function getLastRow(sheet, col) {
-  return getFirstEmptyRow(sheet, col) - 1;
+function getLastRow_(sheet, col) {
+  return getFirstEmptyRow_(sheet, col) - 1;
 }
 
-function findKey(sheet, key, col) {
+function getRichText_(value) {
+  value = value ? value : "";
+  return SpreadsheetApp.newRichTextValue().setText(value).build();
+}
+
+function findKey_(sheet, key, col) {
   let column = sheet.getRange(col+':'+col);
   let values = column.getValues(); // get all data in one call
   let ct = 0;
@@ -182,7 +178,7 @@ function findKey(sheet, key, col) {
   throw new Error("Could not find '"+key+"'");
 }
 
-function incrementKey(ss, key, increment) {
+function incrementKey_(ss, key, increment) {
   increment = increment ? increment : 1;
   let range = ss.getRangeByName(key);
   let values = range.getValues();
