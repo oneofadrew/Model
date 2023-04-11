@@ -1,4 +1,5 @@
-function buildGetModels(spreadsheetId, sheetName, startCol, endCol, hasHeader, builder) {
+function buildGetModels(spreadsheetId, sheetName, keys, startCol, endCol, hasHeader, enricher) {
+  let builder = buildBuildModel_(keys, enricher);
   return function() {
     let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(sheetName);
@@ -14,7 +15,8 @@ function buildGetModels(spreadsheetId, sheetName, startCol, endCol, hasHeader, b
   }
 }
 
-function buildFindModelByKey(spreadsheetId, sheetName, startCol, endCol, builder) {
+function buildFindModelByKey(spreadsheetId, sheetName, keys, startCol, endCol, enricher) {
+  let builder = buildBuildModel_(keys, enricher);
   return function(key) {
     let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(sheetName);
@@ -25,7 +27,8 @@ function buildFindModelByKey(spreadsheetId, sheetName, startCol, endCol, builder
   }
 }
 
-function buildFindModelByRow(spreadsheetId, sheetName, startCol, endCol, builder) {
+function buildFindModelByRow(spreadsheetId, sheetName, keys, startCol, endCol, enricher) {
+  let builder = buildBuildModel_(keys, enricher);
   return function(row) {
     let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(sheetName);
@@ -35,7 +38,8 @@ function buildFindModelByRow(spreadsheetId, sheetName, startCol, endCol, builder
   }
 }
 
-function buildSaveModel(spreadsheetId, sheetName, startCol, endCol, keyName, getModelValues, buildModel) {
+function buildSaveModel(spreadsheetId, sheetName, keys, startCol, endCol, keyName, richTextConverters) {
+  let getModelValues = buildGetModelValues_(keys, richTextConverters);
   return function(model) {
     let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(sheetName);
@@ -78,7 +82,8 @@ function buildSaveModel(spreadsheetId, sheetName, startCol, endCol, keyName, get
   }
 }
 
-function buildBulkInsertModels(spreadsheetId, sheetName, startCol, endCol, keyName, getModels, getModelValues) {
+function buildBulkInsertModels(spreadsheetId, sheetName, keys, startCol, endCol, keyName, getModels, richTextConverters) {
+  let getModelValues = buildGetModelValues_(keys, richTextConverters);
   return function(models) {
     let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(sheetName);
@@ -127,24 +132,6 @@ function buildBulkInsertModels(spreadsheetId, sheetName, startCol, endCol, keyNa
   }
 }
 
-function buildBuildModel(keys, enricher) {
-  return function(values, row) {
-    let model = row ? {"row" : row} : {};
-    for (let i in keys) model[keys[i]] = values[i];
-    return enricher ? enricher(model) : model;
-  }
-}
-
-function buildGetModelValues(keys, richConverters) {
-  let safeConverters = richConverters ? richConverters : [];
-  for (let i in keys) safeConverters[i] = safeConverters[i] ? safeConverters[i] : getRichText_;
-  return function(model) {
-    let values = [];
-    for (let i in keys) values[i] = safeConverters[i](model[keys[i]]);
-    return values;
-  }
-}
-
 function findLastRow(spreadsheetId, sheetName, col) {
   let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(sheetName);
@@ -154,6 +141,24 @@ function findLastRow(spreadsheetId, sheetName, col) {
 /**
  * Spreadsheet navigation
  */
+function buildBuildModel_(keys, enricher) {
+  return function(values, row) {
+    let model = row ? {"row" : row} : {};
+    for (let i in keys) model[keys[i]] = values[i];
+    return enricher ? enricher(model) : model;
+  }
+}
+
+function buildGetModelValues_(keys, richConverters) {
+  let safeConverters = richConverters ? richConverters : [];
+  for (let i in keys) safeConverters[i] = safeConverters[i] ? safeConverters[i] : getRichText_;
+  return function(model) {
+    let values = [];
+    for (let i in keys) values[i] = safeConverters[i](model[keys[i]]);
+    return values;
+  }
+}
+
 function getFirstEmptyRow_(sheet, col) {
   return findKey_(sheet, "", col);
 }
