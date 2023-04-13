@@ -1,3 +1,7 @@
+/**
+ * The ExternalCalls_ object is here to abstract away our external calls to allow us to drive
+ * unit tests with mock objects to validate our functionality is working as expected
+ */
 let ExternalCalls_ = {
   "getSheetByName" : (spreadsheetId, sheetName) => {
     let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
