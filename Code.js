@@ -1,8 +1,31 @@
+/**
+ * The ExternalCalls_ object is here to abstract away our external calls to allow us to drive
+ * unit tests with mock objects to validate our functionality is working as expected
+ */
+let ExternalCalls_ = {
+  "getSheetByName" : (spreadsheetId, sheetName) => {
+    let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
+    return ss.getSheetByName(sheetName);
+  },
+  "getRangeByName" : (spreadsheetId, name) => {
+    let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
+    return ss.getRangeByName(name);
+  },
+  "getDocumentLock" : () => {
+    return LockService.getDocumentLock();
+  },
+  "spreadsheetFlush" : () => {
+    SpreadsheetApp.flush();
+  },
+  "newRichTextValue" : (value) => {
+    return SpreadsheetApp.newRichTextValue().setText(value).build();
+  }
+};
+
 function buildGetModels(spreadsheetId, sheetName, keys, startCol, endCol, hasHeader, enricher) {
   let builder = buildBuildModel_(keys, enricher);
   return function() {
-    let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(sheetName);
+    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
     let row = getLastRow_(sheet, startCol);
     let firstRow = hasHeader ? 2 : 1;
     if (firstRow > row) return [];
@@ -18,8 +41,7 @@ function buildGetModels(spreadsheetId, sheetName, keys, startCol, endCol, hasHea
 function buildFindModelByKey(spreadsheetId, sheetName, keys, startCol, endCol, enricher) {
   let builder = buildBuildModel_(keys, enricher);
   return function(key) {
-    let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(sheetName);
+    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
     let row = findKey_(sheet, key, startCol);
     let values = sheet.getRange(startCol+row + ":" + endCol+row).getValues();
     let model = builder(values[0], row);
@@ -30,8 +52,7 @@ function buildFindModelByKey(spreadsheetId, sheetName, keys, startCol, endCol, e
 function buildFindModelByRow(spreadsheetId, sheetName, keys, startCol, endCol, enricher) {
   let builder = buildBuildModel_(keys, enricher);
   return function(row) {
-    let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(sheetName);
+    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
     let values = sheet.getRange(startCol+row + ":" + endCol+row).getValues();
     let model = builder(values[0], row);
     return model;
@@ -41,8 +62,7 @@ function buildFindModelByRow(spreadsheetId, sheetName, keys, startCol, endCol, e
 function buildSaveModel(spreadsheetId, sheetName, keys, startCol, endCol, keyName, richTextConverters) {
   let getModelValues = buildGetModelValues_(keys, richTextConverters);
   return function(model) {
-    let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(sheetName);
+    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
     // flatten to model values for the record
     let values = [getModelValues(model)];
 
@@ -50,11 +70,11 @@ function buildSaveModel(spreadsheetId, sheetName, keys, startCol, endCol, keyNam
     let keyValue = values[0][0].getText();
     
     // grab the document lock for read and write consistency
-    let lock = LockService.getDocumentLock();
+    let lock = ExternalCalls_.getDocumentLock();
     lock.waitLock(10000);
 
     //if this requires a generated key and the key value isn't set, generate the key
-    keyValue = keyValue || !keyName ? keyValue : incrementKey_(ss, keyName);
+    keyValue = keyValue || !keyName ? keyValue : incrementKey_(spreadsheetId, keyName);
     model[keyName] = keyValue;
     // convert the key back to a rich text value
     values[0][0] = getRichText_(keyValue);
@@ -75,7 +95,7 @@ function buildSaveModel(spreadsheetId, sheetName, keys, startCol, endCol, keyNam
     sheet.getRange(startCol+row + ":" + endCol+row).setRichTextValues(values);
     
     // and we are done
-    SpreadsheetApp.flush();
+    ExternalCalls_.spreadsheetFlush();
     lock.releaseLock();
     model["row"] = row;
     return model;
@@ -85,8 +105,7 @@ function buildSaveModel(spreadsheetId, sheetName, keys, startCol, endCol, keyNam
 function buildBulkInsertModels(spreadsheetId, sheetName, keys, startCol, endCol, keyName, getModels, richTextConverters) {
   let getModelValues = buildGetModelValues_(keys, richTextConverters);
   return function(models) {
-    let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(sheetName);
+    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
     // flatten the models to a 2D array
     let values = []
     for (i in models) {
@@ -94,7 +113,7 @@ function buildBulkInsertModels(spreadsheetId, sheetName, keys, startCol, endCol,
     }
 
     // get the lock - we need to do this before any reads to guarantee both read and write consistency
-    let lock = LockService.getDocumentLock();
+    let lock = ExternalCalls_.getDocumentLock();
     lock.waitLock(10000);
 
     // get a map of the existing keys. in the sheet
@@ -117,7 +136,7 @@ function buildBulkInsertModels(spreadsheetId, sheetName, keys, startCol, endCol,
     }
 
     // if we need to create the keys then create them here
-    let lastKey = incrementKey_(ss, keyName, values.length);
+    let lastKey = incrementKey_(spreadsheetId, keyName, values.length);
     for (let i in values) {
       values[i][0] = lastKey - values.length + i;
     }
@@ -127,14 +146,13 @@ function buildBulkInsertModels(spreadsheetId, sheetName, keys, startCol, endCol,
     sheet.getRange(startCol+row + ":" + endCol+(row+values.length-1)).setValues(values);
 
     // and we are done
-    SpreadsheetApp.flush();
+    ExternalCalls_.spreadsheetFlush();
     lock.releaseLock();
   }
 }
 
 function findLastRow(spreadsheetId, sheetName, col) {
-  let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(sheetName);
+  let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
   return getLastRow_(sheet, col);
 }
 
@@ -169,7 +187,7 @@ function getLastRow_(sheet, col) {
 
 function getRichText_(value) {
   value = value ? value : "";
-  return SpreadsheetApp.newRichTextValue().setText(value).build();
+  return ExternalCalls_.newRichTextValue(value);
 }
 
 function findKey_(sheet, key, col) {
@@ -183,9 +201,9 @@ function findKey_(sheet, key, col) {
   throw new Error("Could not find '"+key+"'");
 }
 
-function incrementKey_(ss, key, increment) {
+function incrementKey_(spreadsheetId, key, increment) {
   increment = increment ? increment : 1;
-  let range = ss.getRangeByName(key);
+  let range = ExternalCalls_.getRangeByName(spreadsheetId, key);
   let values = range.getValues();
   values[0][0] = values[0][0] + increment;
   range.setValues(values);
