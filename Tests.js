@@ -33,7 +33,7 @@ function testRunSearch_() {
     {"key":"four","active":true}
   ]
   let search = newSearch().with("active", true);
-  found = runSearch(search, models);
+  let found = runSearch(search, models);
   Test.isEqual(found.length, 3);
   Test.isEqual(found[0].key, "one");
   Test.isEqual(found[1].key, "two");
