@@ -43,4 +43,8 @@ function testRunSearch_() {
   found = runSearch(search, models);
   Test.isEqual(found.length, 1);
   Test.isEqual(found[0].key, "two");
+
+  search.and("foo", "bar");
+  found = runSearch(search, models);
+  Test.isEqual(found.length, 0);
 }
