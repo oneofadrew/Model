@@ -8,13 +8,13 @@ class Search_ {
     this.terms = {};
   }
 
-  with(term, value) {
+  where(term, value) {
     this.terms[term] = value;
     return this;
   }
   
   and(term, value) {
-    return this.with(term, value);
+    return this.where(term, value);
   }
 }
 

@@ -27,22 +27,22 @@ function getSearchSuite_() {
 
 function testRunSearch_() {
   let models = [
-    {"key":"one","active":true},
-    {"key":"two","active":true},
-    {"key":"three","active":false},
-    {"key":"four","active":true}
+    {"id":1,"key":"one","active":true},
+    {"id":2,"key":"two","active":false},
+    {"id":3,"key":"two","active":true},
+    {"id":4,"key":"three","active":true}
   ]
-  let search = newSearch().with("active", true);
+  let search = newSearch().where("active", true);
   let found = runSearch(search, models);
   Test.isEqual(found.length, 3);
-  Test.isEqual(found[0].key, "one");
-  Test.isEqual(found[1].key, "two");
-  Test.isEqual(found[2].key, "four");
+  Test.isEqual(found[0].id, 1);
+  Test.isEqual(found[1].id, 3);
+  Test.isEqual(found[2].id, 4);
 
   search.and("key", "two");
   found = runSearch(search, models);
   Test.isEqual(found.length, 1);
-  Test.isEqual(found[0].key, "two");
+  Test.isEqual(found[0].id, 3);
 
   search.and("foo", "bar");
   found = runSearch(search, models);
