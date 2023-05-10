@@ -11,7 +11,7 @@ function tearDown_() {
   ExternalCalls_ = originalExtCallsObj_;
 }
 
-function runTests() {
+function runTests_() {
   let suite = Test.newTestSuite("All Tests")
     .addSetUp(setUp_)
     .addTearDown(tearDown_)
