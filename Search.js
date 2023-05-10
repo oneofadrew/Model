@@ -19,7 +19,8 @@ class Search_ {
 }
 
 /**
- * Returns a new Search object
+ * Get a handle on a new Search object
+ * @return {Search} a new Search object to hold search terms.
  */
 function newSearch() {
   return new Search_();
@@ -30,6 +31,9 @@ function newSearch() {
  * Note that the models don't need to have the same shapes, but only models that contain
  * all the search terms will be returned. Models that don't contain one of terms won't
  * cause an exception, but also won't be returned
+ * @param {Search} search - the search terms to run, created by the Model.newSearch() function
+ * @param {[Object]} models - the list of models to search
+ * @return {[Object]} the filtered down list of objects based on the search terms provided.
  */
 function runSearch(search, models) {
   let terms = search.terms;

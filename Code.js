@@ -22,8 +22,26 @@ let ExternalCalls_ = {
   }
 };
 
-function buildGetModels(spreadsheetId, sheetName, keys, startCol, endCol, hasHeader, enricher) {
+function calculateEndColumn_(startCol, length) {
+  let cols = getColumnReferences_();
+  let startIndex = cols.indexOf(startCol);
+  let endIndex = startIndex + length - 1;
+  if (startIndex == -1) throw new Error(`Invalid startCol '${startCol}' provided.`);
+  if (endIndex > 701) throw new Error('The Model library only supports models that go up to column ZZ');
+  return cols[endIndex]; 
+}
+
+function getColumnReferences_() {
+  let cols = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  for (let count = 0; count < 26; count++) {
+    for (let i = 0; i < 26; i++) cols[cols.length] = `${cols[count]}${cols[i]}`;
+  }
+  return cols;
+}
+
+function buildGetModels_(spreadsheetId, sheetName, keys, startCol, hasHeader, enricher) {
   let builder = buildBuildModel_(keys, enricher);
+  let endCol = calculateEndColumn_(startCol, keys.length);
   return function() {
     let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
     let row = getLastRow_(sheet, startCol);
@@ -38,8 +56,9 @@ function buildGetModels(spreadsheetId, sheetName, keys, startCol, endCol, hasHea
   }
 }
 
-function buildFindModelByKey(spreadsheetId, sheetName, keys, startCol, endCol, enricher) {
+function buildFindModelByKey_(spreadsheetId, sheetName, keys, startCol, enricher) {
   let builder = buildBuildModel_(keys, enricher);
+  let endCol = calculateEndColumn_(startCol, keys.length);
   return function(key) {
     let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
     let row = findKey_(sheet, key, startCol);
@@ -49,8 +68,9 @@ function buildFindModelByKey(spreadsheetId, sheetName, keys, startCol, endCol, e
   }
 }
 
-function buildFindModelByRow(spreadsheetId, sheetName, keys, startCol, endCol, enricher) {
+function buildFindModelByRow_(spreadsheetId, sheetName, keys, startCol, enricher) {
   let builder = buildBuildModel_(keys, enricher);
+  let endCol = calculateEndColumn_(startCol, keys.length);
   return function(row) {
     let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
     let values = sheet.getRange(startCol+row + ":" + endCol+row).getValues();
@@ -59,8 +79,9 @@ function buildFindModelByRow(spreadsheetId, sheetName, keys, startCol, endCol, e
   }
 }
 
-function buildSaveModel(spreadsheetId, sheetName, keys, startCol, endCol, keyName, richTextConverters) {
+function buildSaveModel_(spreadsheetId, sheetName, keys, startCol, keyName, richTextConverters) {
   let getModelValues = buildGetModelValues_(keys, richTextConverters);
+  let endCol = calculateEndColumn_(startCol, keys.length);
   return function(model) {
     let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
     // flatten to model values for the record
@@ -102,7 +123,9 @@ function buildSaveModel(spreadsheetId, sheetName, keys, startCol, endCol, keyNam
   }
 }
 
-function buildBulkInsertModels(spreadsheetId, sheetName, keys, startCol, endCol, keyName, getModels, richTextConverters) {
+function buildBulkInsertModels_(spreadsheetId, sheetName, keys, startCol, hasHeader, enricher, keyName, richTextConverters) {
+  let endCol = calculateEndColumn_(startCol, keys.length);
+  let getModels = buildGetModels_(spreadsheetId, sheetName, keys, startCol, endCol, hasHeader, enricher)
   let getModelValues = buildGetModelValues_(keys, richTextConverters);
   return function(models) {
     let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
@@ -151,9 +174,11 @@ function buildBulkInsertModels(spreadsheetId, sheetName, keys, startCol, endCol,
   }
 }
 
-function findLastRow(spreadsheetId, sheetName, col) {
-  let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
-  return getLastRow_(sheet, col);
+function buildFindLastRow_(spreadsheetId, sheetName, col) {
+  return function() {
+    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
+    return getLastRow_(sheet, col);
+  }
 }
 
 /**
