@@ -1,7 +1,5 @@
 /**
  * A Data Access Object wraps up a set of functions to allow easily interactivity across a model
- * The Search class allows for new terms to be added to it afterwards
- * so it allows it to be passed between functions to build up a set of terms via composition.
  */
 class Dao_ {
   constructor(spreadsheetId, sheetName, keys, startCol, hasHeader, enricher, keyName, richTextConverters) {
