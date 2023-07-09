@@ -15,28 +15,129 @@ class Dao_ {
     this.CONVERTERS = safeConverters;
   }
 
+  build(values, row) {
+    //return buildModel_(values, row, this.KEYS, this.ENRICHER)
+    let model = row ? {"row" : row} : {};
+    for (let i in this.KEYS) model[this.KEYS[i]] = values[i];
+    return this.ENRICHER ? this.ENRICHER(model) : model;
+  }
+
   findAll() {
-    return getModels_(this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.HAS_HEADER, this.ENRICHER);
+    //return getModels_(this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.HAS_HEADER, this.ENRICHER);
+    let row = this.findLastRow();
+    let firstRow = this.HAS_HEADER ? 2 : 1;
+    if (firstRow > row) return [];
+    let values = this.SHEET.getRange(this.START_COL+firstRow + ":" + this.END_COL+(row)).getValues();
+    let models = [];
+    for (let i in values) {
+      models[i] = this.build(values[i], firstRow + Number(i));
+    }
+    return models;
   }
   
   findByKey(key) {
-    return findModelByKey_(key, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.ENRICHER);
+    //return findModelByKey_(key, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.ENRICHER);
+    let row = findKey_(this.SHEET, key, this.START_COL);
+    return this.findByRow(row);
   }
   
   findByRow(row) {
-    return findModelByRow_(row, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.ENRICHER);
+    //return findModelByRow_(row, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.ENRICHER);
+    let values = this.SHEET.getRange(this.START_COL+row + ":" + this.END_COL+row).getValues();
+    return this.build(values[0], row);
   }
   
   save(model) {
-    return saveModel_(model, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.SEQUENCE, this.CONVERTERS);
+    //return saveModel_(model, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.SEQUENCE, this.CONVERTERS);
+
+    // flatten to model values for the record
+    let values = [getModelValues_(model, this.KEYS, this.CONVERTERS)];
+
+    // check if we are processing rich text values or not
+    let keyValue = values[0][0].getText();
+    
+    // grab the document lock for read and write consistency
+    let lock = ExternalCalls_.getDocumentLock();
+    lock.waitLock(10000);
+
+    //if this requires a generated key and the key value isn't set, generate the key
+    keyValue = keyValue || !this.SEQUENCE ? keyValue : incrementKey_(this.SEQUENCE);
+    model[this.KEYS[0]] = keyValue;
+    // convert the key back to a rich text value
+    values[0][0] = getRichText_(keyValue);
+
+    // try to find a record to update based on the key, otherwise we'll create a new record
+    let row;
+    try {
+      row = findKey_(this.SHEET, keyValue, this.START_COL);
+    } catch (e) {
+      row = getFirstEmptyRow_(this.SHEET, this.START_COL);
+    }
+
+    if (model.row && model.row != row) {
+      throw new Error(`The row of the model (${model.row}) did not match the row of the primary key (${values[0][0]}) of the model (${row})`);
+    }
+
+    // write the values for the record
+    this.SHEET.getRange(this.START_COL+row + ":" + this.END_COL+row).setRichTextValues(values);
+    
+    // and we are done
+    ExternalCalls_.spreadsheetFlush();
+    lock.releaseLock();
+    model["row"] = row;
+    return model;
   }
   
   bulkInsert(models) {
-    return bulkInsertModels_(models, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.HAS_HEADER, this.ENRICHER, this.SEQUENCE, this.CONVERTERS);
+    //return bulkInsertModels_(models, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.HAS_HEADER, this.ENRICHER, this.SEQUENCE, this.CONVERTERS);
+
+    // flatten the models to a 2D array
+    let values = []
+    for (i in models) {
+      values[i] = getModelValues_(models[i], this.KEYS, this.CONVERTERS);
+    }
+
+    // get the lock - we need to do this before any reads to guarantee both read and write consistency
+    let lock = ExternalCalls_.getDocumentLock();
+    lock.waitLock(10000);
+
+    // get a map of the existing keys. in the sheet
+    let existing = this.findAll();
+    let existingKeys = {};
+    for (i in existing) {
+      let existingValues = getModelValues_(existing[i], this.KEYS, this.CONVERTERS);
+      existingKeys[existingValues[0]] = true;
+    }
+
+    // iterate over the new values for bulk insert to find any duplicates
+    let duplicateKeys = ""
+    for (i in values) {
+      duplicateKeys = existingKeys[values[i][0]] ? duplicateKeys + " " + values[i][0] : duplicateKeys;
+    }
+
+    // if we found any duplicates raise an error
+    if (duplicateKeys != "") {
+      throw new Error("The bulk insert has duplicate keys:" + duplicateKeys);
+    }
+
+    // if we need to create the keys then create them here
+    let lastKey = incrementKey_(this.SEQUENCE, values.length);
+    for (let i in values) {
+      values[i][0] = lastKey - values.length + i;
+    }
+    
+    // we are good to progress so run the insert
+    let row = getFirstEmptyRow_(this.SHEET, this.START_COL);
+    this.SHEET.getRange(this.START_COL+row + ":" + this.END_COL+(row+values.length-1)).setValues(values);
+
+    // and we are done
+    ExternalCalls_.spreadsheetFlush();
+    lock.releaseLock();
   }
   
   findLastRow() {
-    return findLastRow_(this.SHEET, this.START_COL);
+    //return findLastRow_(this.SHEET, this.START_COL);
+    return getFirstEmptyRow_(this.SHEET, this.START_COL) - 1;
   }
   
   search(terms) {
