@@ -3,14 +3,6 @@
  * unit tests with mock objects to validate our functionality is working as expected
  */
 let ExternalCalls_ = {
-  "getSheetByName" : (spreadsheetId, sheetName) => {
-    let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
-    return ss.getSheetByName(sheetName);
-  },
-  "getRangeByName" : (spreadsheetId, name) => {
-    let ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
-    return ss.getRangeByName(name);
-  },
   "getDocumentLock" : () => {
     return LockService.getDocumentLock();
   },
@@ -22,192 +14,18 @@ let ExternalCalls_ = {
   }
 };
 
-function calculateEndColumn_(startCol, length) {
-  let cols = getColumnReferences_();
-  let startIndex = cols.indexOf(startCol);
-  let endIndex = startIndex + length - 1;
-  if (startIndex == -1) throw new Error(`Invalid startCol '${startCol}' provided.`);
-  if (endIndex > 701) throw new Error('The Model library only supports models that go up to column ZZ');
-  return cols[endIndex]; 
-}
-
-function getColumnReferences_() {
-  let cols = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  for (let count = 0; count < 26; count++) {
-    for (let i = 0; i < 26; i++) cols[cols.length] = `${cols[count]}${cols[i]}`;
-  }
-  return cols;
-}
-
-function buildGetModels_(spreadsheetId, sheetName, keys, startCol, hasHeader, enricher) {
-  let builder = buildBuildModel_(keys, enricher);
-  let endCol = calculateEndColumn_(startCol, keys.length);
-  return function() {
-    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
-    let row = getLastRow_(sheet, startCol);
-    let firstRow = hasHeader ? 2 : 1;
-    if (firstRow > row) return [];
-    let values = sheet.getRange(startCol+firstRow + ":" + endCol+(row)).getValues();
-    let models = [];
-    for (let i in values) {
-      models[i] = builder(values[i], i + firstRow);
-    }
-    return models;
-  }
-}
-
-function buildFindModelByKey_(spreadsheetId, sheetName, keys, startCol, enricher) {
-  let builder = buildBuildModel_(keys, enricher);
-  let endCol = calculateEndColumn_(startCol, keys.length);
-  return function(key) {
-    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
-    let row = findKey_(sheet, key, startCol);
-    let values = sheet.getRange(startCol+row + ":" + endCol+row).getValues();
-    let model = builder(values[0], row);
-    return model;
-  }
-}
-
-function buildFindModelByRow_(spreadsheetId, sheetName, keys, startCol, enricher) {
-  let builder = buildBuildModel_(keys, enricher);
-  let endCol = calculateEndColumn_(startCol, keys.length);
-  return function(row) {
-    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
-    let values = sheet.getRange(startCol+row + ":" + endCol+row).getValues();
-    let model = builder(values[0], row);
-    return model;
-  }
-}
-
-function buildSaveModel_(spreadsheetId, sheetName, keys, startCol, keyName, richTextConverters) {
-  let getModelValues = buildGetModelValues_(keys, richTextConverters);
-  let endCol = calculateEndColumn_(startCol, keys.length);
-  return function(model) {
-    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
-    // flatten to model values for the record
-    let values = [getModelValues(model)];
-
-    // check if we are processing rich text values or not
-    let keyValue = values[0][0].getText();
-    
-    // grab the document lock for read and write consistency
-    let lock = ExternalCalls_.getDocumentLock();
-    lock.waitLock(10000);
-
-    //if this requires a generated key and the key value isn't set, generate the key
-    keyValue = keyValue || !keyName ? keyValue : incrementKey_(spreadsheetId, keyName);
-    model[keyName] = keyValue;
-    // convert the key back to a rich text value
-    values[0][0] = getRichText_(keyValue);
-
-    // try to find a record to update based on the key, otherwise we'll create a new record
-    let row;
-    try {
-      row = findKey_(sheet, keyValue, startCol);
-    } catch (e) {
-      row = getFirstEmptyRow_(sheet, startCol);
-    }
-
-    if (model.row && model.row != row) {
-      throw new Error(`The row of the model (${model.row}) did not match the row of the primary key (${values[0][0]}) of the model (${row})`);
-    }
-
-    // write the values for the record
-    sheet.getRange(startCol+row + ":" + endCol+row).setRichTextValues(values);
-    
-    // and we are done
-    ExternalCalls_.spreadsheetFlush();
-    lock.releaseLock();
-    model["row"] = row;
-    return model;
-  }
-}
-
-function buildBulkInsertModels_(spreadsheetId, sheetName, keys, startCol, hasHeader, enricher, keyName, richTextConverters) {
-  let endCol = calculateEndColumn_(startCol, keys.length);
-  let getModels = buildGetModels_(spreadsheetId, sheetName, keys, startCol, endCol, hasHeader, enricher)
-  let getModelValues = buildGetModelValues_(keys, richTextConverters);
-  return function(models) {
-    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
-    // flatten the models to a 2D array
-    let values = []
-    for (i in models) {
-      values[i] = getModelValues(models[i]);
-    }
-
-    // get the lock - we need to do this before any reads to guarantee both read and write consistency
-    let lock = ExternalCalls_.getDocumentLock();
-    lock.waitLock(10000);
-
-    // get a map of the existing keys. in the sheet
-    let existing = getModels();
-    let existingKeys = {};
-    for (i in existing) {
-      let existingValues = getModelValues(existing[i]);
-      existingKeys[existingValues[0]] = true;
-    }
-
-    // iterate over the new values for bulk insert to find any duplicates
-    let duplicateKeys = ""
-    for (i in values) {
-      duplicateKeys = existingKeys[values[i][0]] ? duplicateKeys + " " + values[i][0] : duplicateKeys;
-    }
-
-    // if we found any duplicates raise an error
-    if (duplicateKeys != "") {
-      throw new Error("The bulk insert has duplicate keys:" + duplicateKeys);
-    }
-
-    // if we need to create the keys then create them here
-    let lastKey = incrementKey_(spreadsheetId, keyName, values.length);
-    for (let i in values) {
-      values[i][0] = lastKey - values.length + i;
-    }
-    
-    // we are good to progress so run the insert
-    let row = getFirstEmptyRow_(sheet, startCol);
-    sheet.getRange(startCol+row + ":" + endCol+(row+values.length-1)).setValues(values);
-
-    // and we are done
-    ExternalCalls_.spreadsheetFlush();
-    lock.releaseLock();
-  }
-}
-
-function buildFindLastRow_(spreadsheetId, sheetName, col) {
-  return function() {
-    let sheet = ExternalCalls_.getSheetByName(spreadsheetId, sheetName);
-    return getLastRow_(sheet, col);
-  }
-}
-
 /**
- * Spreadsheet navigation
+ * Helper functions
  */
-function buildBuildModel_(keys, enricher) {
-  return function(values, row) {
-    let model = row ? {"row" : row} : {};
-    for (let i in keys) model[keys[i]] = values[i];
-    return enricher ? enricher(model) : model;
-  }
-}
 
-function buildGetModelValues_(keys, richConverters) {
-  let safeConverters = richConverters ? richConverters : [];
-  for (let i in keys) safeConverters[i] = safeConverters[i] ? safeConverters[i] : getRichText_;
-  return function(model) {
+function getModelValues_(model, keys, converters) {
     let values = [];
-    for (let i in keys) values[i] = safeConverters[i](model[keys[i]]);
+    for (let i in keys) values[i] = converters[i](model[keys[i]]);
     return values;
-  }
 }
 
 function getFirstEmptyRow_(sheet, col) {
   return findKey_(sheet, "", col);
-}
-
-function getLastRow_(sheet, col) {
-  return getFirstEmptyRow_(sheet, col) - 1;
 }
 
 function getRichText_(value) {
@@ -226,11 +44,9 @@ function findKey_(sheet, key, col) {
   throw new Error("Could not find '"+key+"'");
 }
 
-function incrementKey_(spreadsheetId, key, increment) {
-  increment = increment ? increment : 1;
-  let range = ExternalCalls_.getRangeByName(spreadsheetId, key);
-  let values = range.getValues();
+function incrementKey_(sequence, increment = 1) {
+  let values = sequence.getValues();
   values[0][0] = values[0][0] + increment;
-  range.setValues(values);
+  sequence.setValues(values);
   return values[0][0];
 }
