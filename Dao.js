@@ -16,14 +16,12 @@ class Dao_ {
   }
 
   build(values, row) {
-    //return buildModel_(values, row, this.KEYS, this.ENRICHER)
     let model = row ? {"row" : row} : {};
     for (let i in this.KEYS) model[this.KEYS[i]] = values[i];
     return this.ENRICHER ? this.ENRICHER(model) : model;
   }
 
   findAll() {
-    //return getModels_(this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.HAS_HEADER, this.ENRICHER);
     let row = this.findLastRow();
     let firstRow = this.HAS_HEADER ? 2 : 1;
     if (firstRow > row) return [];
@@ -36,24 +34,20 @@ class Dao_ {
   }
   
   findByKey(key) {
-    //return findModelByKey_(key, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.ENRICHER);
     let row = findKey_(this.SHEET, key, this.START_COL);
     return this.findByRow(row);
   }
   
   findByRow(row) {
-    //return findModelByRow_(row, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.ENRICHER);
     let values = this.SHEET.getRange(this.START_COL+row + ":" + this.END_COL+row).getValues();
     return this.build(values[0], row);
   }
   
   save(model) {
-    //return saveModel_(model, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.SEQUENCE, this.CONVERTERS);
-
     // flatten to model values for the record
     let values = [getModelValues_(model, this.KEYS, this.CONVERTERS)];
 
-    // check if we are processing rich text values or not
+    // get the key value
     let keyValue = values[0][0].getText();
     
     // grab the document lock for read and write consistency
@@ -88,55 +82,74 @@ class Dao_ {
     return model;
   }
   
-  bulkInsert(models) {
-    //return bulkInsertModels_(models, this.SHEET, this.KEYS, this.START_COL, this.END_COL, this.HAS_HEADER, this.ENRICHER, this.SEQUENCE, this.CONVERTERS);
-
+  bulkSave(models) {
     // flatten the models to a 2D array
-    let values = []
-    for (i in models) {
-      values[i] = getModelValues_(models[i], this.KEYS, this.CONVERTERS);
-    }
+    const values = models.map(model => getModelValues_(model, this.KEYS, this.CONVERTERS));
 
     // get the lock - we need to do this before any reads to guarantee both read and write consistency
     let lock = ExternalCalls_.getDocumentLock();
     lock.waitLock(10000);
 
     // get a map of the existing keys. in the sheet
-    let existing = this.findAll();
-    let existingKeys = {};
-    for (i in existing) {
-      let existingValues = getModelValues_(existing[i], this.KEYS, this.CONVERTERS);
-      existingKeys[existingValues[0]] = true;
-    }
+    const existing = this.findAll();
+    const existingValues = existing.map(model => getModelValues_(model, this.KEYS, this.CONVERTERS));
+    const rowForKey = existingValues.reduce((keys, list, i) => Object.assign(keys, {[list[0].getText()]: existing[i].row}), {});
+    const newValues = values.filter(value => !rowForKey[value[0].getText()]);
+    
+    //this creates an array of objects that already exist (by key) in the sheet with the row assigned to the values in each array entry
+    let updatedValues = values.map((value, i) => rowForKey[value[0].getText()] ? {"row": rowForKey[value[0].getText()], "values" : value, "model": models[i]} : {"newRecord":true}).filter(value => !value.newRecord);
+    //and then sorts them by row
+    updatedValues.sort((a, b) => {return a.row - b.row});
 
-    // iterate over the new values for bulk insert to find any duplicates
-    let duplicateKeys = ""
-    for (i in values) {
-      duplicateKeys = existingKeys[values[i][0]] ? duplicateKeys + " " + values[i][0] : duplicateKeys;
-    }
+    //Time to update the existing models. While it's only one line of code, Using a record by record approach like this is slow because it looks up the key and finds the row and does the validation for each model over again. for even 30 models with less 10 fields I've timed this process as taking more than 10 seconds
+    //all again:
+    //updatedValues.forEach(record => this.save(record.model));
 
-    // if we found any duplicates raise an error
-    if (duplicateKeys != "") {
-      throw new Error("The bulk insert has duplicate keys:" + duplicateKeys);
-    }
+    //Instead the records have been sorted according to their row positions in the spreadsheet, so instead we can go through and group them
+    //into contiguous sets of records with a starting row.
+    let updatedRecordSets = [];
+    let lastRow = -1;
+    updatedValues.forEach(record => {
+      let recordSet = record.row > lastRow + 1 ? {"row": record.row, "values": []} : updatedRecordSets.pop();
+      recordSet.values.push(record.values);
+      lastRow = record.row;
+      updatedRecordSets.push(recordSet);
+    })
+
+    //Now that we have this new data structure we can for each one insert the record sets as a block of values to optimise our write times.
+    updatedRecordSets.forEach(recordSet => {
+      this.SHEET.getRange(`${this.START_COL}${recordSet.row}:${this.END_COL}${recordSet.row+recordSet.values.length-1}`).setRichTextValues(recordSet.values);
+    })
 
     // if we need to create the keys then create them here
-    let lastKey = incrementKey_(this.SEQUENCE, values.length);
-    for (let i in values) {
-      values[i][0] = lastKey - values.length + i;
+    if (this.SEQUENCE) {
+      let lastKey = incrementKey_(this.SEQUENCE, newValues.length);
+      for (let i in values) {
+        newValues[i][0] = lastKey - newValues.length + i;
+      }
     }
-    
-    // we are good to progress so run the insert
-    let row = getFirstEmptyRow_(this.SHEET, this.START_COL);
-    this.SHEET.getRange(this.START_COL+row + ":" + this.END_COL+(row+values.length-1)).setValues(values);
+
+    // save the new records
+    if (newValues.length > 0) {
+      let row = getFirstEmptyRow_(this.SHEET, this.START_COL);
+      this.SHEET.getRange(`${this.START_COL}${row}:${this.END_COL}${row+newValues.length-1}`).setRichTextValues(newValues);
+    }
 
     // and we are done
     ExternalCalls_.spreadsheetFlush();
     lock.releaseLock();
   }
+
+  clear(safety = false) {
+    if (safety) {
+      const firstRow = this.HAS_HEADER ? 2 : 1;
+      const lastRow = this.findLastRow() < firstRow ? firstRow : this.findLastRow();
+      Logger.log(`${firstRow}:${lastRow}`);
+      this.SHEET.getRange(`${this.START_COL}${firstRow}:${this.END_COL}${lastRow}`).clearContent();
+    }
+  }
   
   findLastRow() {
-    //return findLastRow_(this.SHEET, this.START_COL);
     return getFirstEmptyRow_(this.SHEET, this.START_COL) - 1;
   }
   

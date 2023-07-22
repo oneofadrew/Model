@@ -11,7 +11,7 @@ function tearDown_() {
   ExternalCalls_ = originalExtCallsObj_;
 }
 
-function runTests_() {
+function runUnitTests_() {
   let suite = Test.newTestSuite("All Tests")
     .addSetUp(setUp_)
     .addTearDown(tearDown_)
@@ -20,6 +20,8 @@ function runTests_() {
     .addSuite(getDaoSuite_());
   suite.run();
 }
+
+/* ----------------------------------------------------------------------------------------- */
 
 function getBuilderSuite_() {
   let suite = Test.newTestSuite("Builders")
@@ -41,6 +43,8 @@ function testCalculateEndCol_() {
   Test.willFail(()=>{calculateEndColumn_('A', 703)});
   Test.willFail(()=>{calculateEndColumn_('B', 702)});
 }
+
+/* ----------------------------------------------------------------------------------------- */
 
 function getSearchSuite_() {
   let suite = Test.newTestSuite("Search")
@@ -71,6 +75,8 @@ function testRunSearch_() {
   found = runSearch(search, models);
   Test.isEqual(found.length, 0);
 }
+
+/* ----------------------------------------------------------------------------------------- */
 
 function getDaoSuite_() {
   let suite = Test.newTestSuite("Dao")
@@ -107,3 +113,5 @@ function testToCamelCase_() {
   Test.isEqual(toCamelCase_("Equipment Class Name"), 'equipmentClassName');
   Test.isEqual(toCamelCase_("DASS 21"), 'dass21');
 }
+
+/* ----------------------------------------------------------------------------------------- */

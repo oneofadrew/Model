@@ -1,15 +1,14 @@
 {
   "timeZone": "Australia/Sydney",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
   "dependencies": {
     "libraries": [
       {
         "userSymbol": "Test",
-        "version": "3",
         "libraryId": "1TZrBmO78K_oe1jpsBKNwrlAHs2T3fUXhuUoKBLexWrs0GUAHgbPSOS-k",
-        "developmentMode": false
+        "version": "3"
       }
     ]
-  },
-  "exceptionLogging": "STACKDRIVER",
-  "runtimeVersion": "V8"
+  }
 }
