@@ -1,4 +1,3 @@
-
 let externalCallsMock_ = Test.newMock();
 let originalExtCallsObj_ = ExternalCalls_;
 
