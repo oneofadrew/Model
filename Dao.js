@@ -16,7 +16,7 @@ class Dao_ {
   }
 
   build(values, row) {
-    let model = this.KEYS.reduce((model, key, i) => Object.assign(model, {[key]: values[i]}, {"row": row}))
+    const model = this.KEYS.reduce((model, key, i) => Object.assign(model, {[key]: values[i]}), {"row": row});
     return this.ENRICHER ? this.ENRICHER(model) : model;
   }
 
