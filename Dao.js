@@ -16,21 +16,16 @@ class Dao_ {
   }
 
   build(values, row) {
-    let model = row ? {"row" : row} : {};
-    for (let i in this.KEYS) model[this.KEYS[i]] = values[i];
+    let model = this.KEYS.reduce((model, key, i) => Object.assign(model, {[key]: values[i]}, {"row": row}))
     return this.ENRICHER ? this.ENRICHER(model) : model;
   }
 
   findAll() {
-    let row = this.findLastRow();
-    let firstRow = this.HAS_HEADER ? 2 : 1;
+    const row = this.findLastRow();
+    const firstRow = this.HAS_HEADER ? 2 : 1;
     if (firstRow > row) return [];
-    let values = this.SHEET.getRange(this.START_COL+firstRow + ":" + this.END_COL+(row)).getValues();
-    let models = [];
-    for (let i in values) {
-      models[i] = this.build(values[i], firstRow + Number(i));
-    }
-    return models;
+    const values = this.SHEET.getRange(this.START_COL+firstRow + ":" + this.END_COL+(row)).getValues();
+    return values.map((value, i) => this.build(value, firstRow + Number(i)));
   }
   
   findByKey(key) {
@@ -97,7 +92,7 @@ class Dao_ {
     const newValues = values.filter(value => !rowForKey[value[0].getText()]);
     
     //this creates an array of objects that already exist (by key) in the sheet with the row assigned to the values in each array entry
-    let updatedValues = values.map((value, i) => rowForKey[value[0].getText()] ? {"row": rowForKey[value[0].getText()], "values" : value, "model": models[i]} : {"newRecord":true}).filter(value => !value.newRecord);
+    let updatedValues = values.map((value, i) => rowForKey[value[0].getText()] ? {"row": rowForKey[value[0].getText()], "values" : value} : {"newRecord":true}).filter(value => !value.newRecord);
     //and then sorts them by row
     updatedValues.sort((a, b) => {return a.row - b.row});
 
