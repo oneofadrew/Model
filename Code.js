@@ -17,11 +17,8 @@ let ExternalCalls_ = {
 /**
  * Helper functions
  */
-
 function getModelValues_(model, keys, converters) {
-    let values = [];
-    for (let i in keys) values[i] = converters[i](model[keys[i]]);
-    return values;
+    return keys.map((key, i) => converters[i](model[key]));
 }
 
 function getFirstEmptyRow_(sheet, col) {
@@ -45,8 +42,8 @@ function findKey_(sheet, key, col) {
 }
 
 function incrementKey_(sequence, increment = 1) {
-  let values = sequence.getValues();
-  values[0][0] = values[0][0] + increment;
-  sequence.setValues(values);
-  return values[0][0];
+  const values = sequence.getValues();
+  const newValue = values[0][0] + increment;
+  sequence.setValues([[newValue]]);
+  return newValue;
 }
