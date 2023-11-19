@@ -10,8 +10,8 @@ class Dao_ {
     this.HAS_HEADER = hasHeader;
     this.ENRICHER = enricher;
     this.SEQUENCE = sequence;
-    let safeConverters = richConverters ? richConverters : [];
-    this.CONVERTERS = keys.map((_,i) => safeConverters[i] ? safeConverters[i] : getRichText_);
+    let converters = richConverters ? richConverters : {};
+    this.CONVERTERS = keys.reduce((safeConverters, key) => {return {...safeConverters, ...{[key] : converters[key] ? converters[key] : getRichText_}}}, {});
   }
 
   build(values, row) {
@@ -52,7 +52,7 @@ class Dao_ {
     keyValue = keyValue || !this.SEQUENCE ? keyValue : incrementKey_(this.SEQUENCE);
     model[this.KEYS[0]] = keyValue;
     // convert the key back to a rich text value
-    values[0][0] = getRichText_(keyValue);
+    values[0][0] = this.CONVERTERS[this.KEYS[0]](keyValue);
 
     // try to find a record to update based on the key, otherwise we'll create a new record
     let row;
@@ -79,6 +79,12 @@ class Dao_ {
   bulkSave(models) {
     // flatten the models to a 2D array
     const values = models.map(model => getModelValues_(model, this.KEYS, this.CONVERTERS));
+
+    //todo - check for duplicate keys
+    if (!this.SEQUENCE) {
+      
+    }
+
 
     // get the lock - we need to do this before any reads to guarantee both read and write consistency
     let lock = ExternalCalls_.getDocumentLock();
