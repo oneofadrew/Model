@@ -26,7 +26,7 @@ function getFirstEmptyRow_(sheet, col) {
 }
 
 function getRichText_(value) {
-  value = value ? value : "";
+  value = (value == null || value == undefined) ? "" :  value;
   return ExternalCalls_.newRichTextValue(value);
 }
 
