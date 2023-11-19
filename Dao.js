@@ -6,11 +6,11 @@ class Dao_ {
     this.SHEET = sheet;
     this.KEYS = keys;
     this.START_COL = startCol;
-    this.END_COL = calculateEndColumn_(startCol, keys.length);;
+    this.END_COL = calculateEndColumn_(startCol, keys.length);
     this.HAS_HEADER = hasHeader;
     this.ENRICHER = enricher;
     this.SEQUENCE = sequence;
-    let converters = richConverters ? richConverters : {};
+    const converters = richConverters ? richConverters : {};
     this.CONVERTERS = keys.reduce((safeConverters, key) => {return {...safeConverters, ...{[key] : converters[key] ? converters[key] : getRichText_}}}, {});
   }
 
@@ -124,9 +124,7 @@ class Dao_ {
     // if we need to create the keys then create them here
     if (this.SEQUENCE) {
       let lastKey = incrementKey_(this.SEQUENCE, newValues.length);
-      for (let i in values) {
-        newValues[i][0] = lastKey - newValues.length + i;
-      }
+      newValues = newValues.map((modelValues, i) => [(lastKey - newValues.length + i)].concat(modelValues.slice(1)));
     }
 
     // save the new records
@@ -144,7 +142,6 @@ class Dao_ {
     if (safety) {
       const firstRow = this.HAS_HEADER ? 2 : 1;
       const lastRow = this.findLastRow() < firstRow ? firstRow : this.findLastRow();
-      Logger.log(`${firstRow}:${lastRow}`);
       this.SHEET.getRange(`${this.START_COL}${firstRow}:${this.END_COL}${lastRow}`).clearContent();
     }
   }
@@ -214,20 +211,19 @@ function inferMetadata_(values, startCol) {
   let keys = values[0].slice(start, end);
 
   //convert the header values to camel case keys 
-  for (i in keys) keys[i] = toCamelCase_(keys[i]);
-  metadata["keys"] = keys;
+  metadata["keys"] = keys.map(key => toCamelCase_(key));
 
   //return the inferred metadata
   return metadata;
 }
 
 function toCamelCase_(str) {
-  let words = str.trim().split(/\s+/);
-  for (i in words) {
-    words[i] = words[i].toLowerCase();
-    if (i > 0) words[i] = words[i].charAt(0).toUpperCase() + words[i].slice(1);
-  }
-  return words.join('');
+  const words = str.trim().split(/\s+/);
+  return words.map((word, i) => {
+    word = word.toLowerCase();
+    if (i > 0) word = word.charAt(0).toUpperCase() + word.slice(1);
+    return word;
+  }).join('');
 }
 
 function calculateEndColumn_(startCol, length) {
@@ -241,8 +237,5 @@ function calculateEndColumn_(startCol, length) {
 
 function getColumnReferences_() {
   let cols = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  for (let count = 0; count < 26; count++) {
-    for (let i = 0; i < 26; i++) cols[cols.length] = `${cols[count]}${cols[i]}`;
-  }
-  return cols;
+  return cols.concat(cols.map(col1 => cols.map(col2 => `${col1}${col2}`)).flat(1));
 }

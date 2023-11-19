@@ -26,10 +26,11 @@ let ExternalCalls_ = {
  */
 
 /**
- * 
- * cause an exception, but also won't be returned
+ * This gets a RichTextConverter that has a link to a URL. The converter will be called every
+ * time there is a write to the spreadsheet for a value in this field to write the value with
+ * a link to the calculated URL from calcUrlFn.
  * @param {Function} calcUrlFn - the function that calculates the URL for a value
- * @return {RichTextConverter} The rich text value for the 
+ * @return {RichTextConverter} A converter to rich text value with the calculated URL as a link
  */
 function getUrlConverter(calcUrlFn) {
   return ExternalCalls_.newUrlConverter(calcUrlFn);
@@ -45,9 +46,6 @@ function getRichText_(value) {
  * Helper functions
  */
 function getModelValues_(model, keys, converters) {
-  Logger.log(keys);
-  Logger.log(converters);
-  Logger.log(model);
   return keys.map(key => converters[key](model[key]));
 }
 
@@ -71,23 +69,6 @@ function findKey_(sheet, key, col) {
   if (pos.length == 1) return pos[0][0] + 1;
 
   //no key found - throw and error
-  throw new Error(`Could not find '${key}'`);
-}
-
-function test() {
-  let key = null;
-  let pos = testFn(key);
-  Logger.log(`${key} at position ${pos}`);
-}
-
-function testFn(key) {
-  let values = [["key1"],["key2"],["key3"],["value4"],["key5"], [], []];
-  
-  const keysByPos = values.map((value, i) => [i, value[0]]);
-  const pos = keysByPos.filter(value => value[1] == key);
-  //we are looking for the first empty row here
-  if (!key) return pos[0][0] + 1;
-  if (pos.length == 1) return pos[0][0] + 1;
   throw new Error(`Could not find '${key}'`);
 }
 
