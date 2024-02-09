@@ -73,7 +73,7 @@ class Dao_ {
     ExternalCalls_.spreadsheetFlush();
     lock.releaseLock();
     model["row"] = row;
-    return model;
+    return this.ENRICHER(model);
   }
   
   bulkSave(models) {
@@ -85,7 +85,6 @@ class Dao_ {
       
     }
 
-
     // get the lock - we need to do this before any reads to guarantee both read and write consistency
     let lock = ExternalCalls_.getDocumentLock();
     lock.waitLock(10000);
@@ -95,18 +94,19 @@ class Dao_ {
     const existingValues = existing.map(model => getModelValues_(model, this.KEYS, this.CONVERTERS));
     const rowForKey = existingValues.reduce((keys, list, i) => Object.assign(keys, {[list[0].getText()]: existing[i].row}), {});
     const newValues = values.filter(value => !rowForKey[value[0].getText()]);
-    
+
     //this creates an array of objects that already exist (by key) in the sheet with the row assigned to the values in each array entry
     let updatedValues = values.map((value, i) => rowForKey[value[0].getText()] ? {"row": rowForKey[value[0].getText()], "values" : value} : {"newRecord":true}).filter(value => !value.newRecord);
     //and then sorts them by row
     updatedValues.sort((a, b) => {return a.row - b.row});
 
-    //Time to update the existing models. While it's only one line of code, Using a record by record approach like this is slow because it looks up the key and finds the row and does the validation for each model over again. for even 30 models with less 10 fields I've timed this process as taking more than 10 seconds
-    //all again:
+    //Time to update the existing models. While it's only one line of code, Using a record by record approach
+    //is slow because it looks up the key and finds the row and does the validation for each model over again.
+    //for even 30 models with less 10 fields I've timed this process as taking more than 10 seconds
     //updatedValues.forEach(record => this.save(record.model));
 
-    //Instead the records have been sorted according to their row positions in the spreadsheet, so instead we can go through and group them
-    //into contiguous sets of records with a starting row.
+    //Instead the records have been sorted according to their row positions in the spreadsheet, so instead we can go
+    //through and group them into contiguous sets of records with a starting row.
     let updatedRecordSets = [];
     let lastRow = -1;
     updatedValues.forEach(record => {
@@ -168,7 +168,7 @@ class Dao_ {
  * @return {Dao} a data access object that encapsulates the data access functions for the metadata provided.
  */
 function createDao(sheet, keys, startCol, hasHeader, enricher, sequence, richTextConverters) {
-  return new Dao_(sheet, keys, startCol, hasHeader, enricher, sequence, richTextConverters)
+  return new Dao_(sheet, keys, startCol, hasHeader, enricher, sequence, richTextConverters);
 }
 
 /**
@@ -199,7 +199,6 @@ function inferMetadata_(values, startCol) {
   //where do we end having header values
   let end = start;
   while (values[0][end] != '' && values[0].length >= end) end++;
-  //end++; //we will use this in an array.slice() function, which ignores the final element at end index
   
   //the metadata object to return
   let metadata = {};
@@ -220,9 +219,8 @@ function inferMetadata_(values, startCol) {
 function toCamelCase_(str) {
   const words = str.trim().split(/\s+/);
   return words.map((word, i) => {
-    word = word.toLowerCase();
-    if (i > 0) word = word.charAt(0).toUpperCase() + word.slice(1);
-    return word;
+    if (i == 0) return word.toLowerCase();
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
   }).join('');
 }
 

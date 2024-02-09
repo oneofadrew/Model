@@ -68,7 +68,7 @@ function findKey_(sheet, key, col) {
   //and return its position
   if (pos.length == 1) return pos[0][0] + 1;
 
-  //no key found - throw and error
+  //no key found - throw an error
   throw new Error(`Could not find '${key}'`);
 }
 
