@@ -73,7 +73,7 @@ class Dao_ {
     ExternalCalls_.spreadsheetFlush();
     lock.releaseLock();
     model["row"] = row;
-    return this.ENRICHER(model);
+    return this.ENRICHER ? this.ENRICHER(model) : model;
   }
   
   bulkSave(models) {
