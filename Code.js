@@ -1,27 +1,4 @@
 /**
- * The ExternalCalls_ object is here to abstract away our external calls to allow us to drive
- * unit tests with mock objects to validate our functionality is working as expected
- */
-let ExternalCalls_ = {
-  "getDocumentLock" : () => {
-    return LockService.getDocumentLock();
-  },
-  "spreadsheetFlush" : () => {
-    SpreadsheetApp.flush();
-  },
-  "newRichTextValue" : (value) => {
-    return SpreadsheetApp.newRichTextValue().setText(value).build();
-  },
-  "newUrlConverter" : (calcUrlFn) => {
-    return (value) => {
-      const safeValue = (value == null || value == undefined) ? "" : value;
-      const url = calcUrlFn(value);
-      return SpreadsheetApp.newRichTextValue().setText(safeValue).setLinkUrl(url).build();
-    }
-  }
-};
-
-/**
  * Rich Text Converters
  */
 
@@ -29,17 +6,21 @@ let ExternalCalls_ = {
  * This gets a RichTextConverter that has a link to a URL. The converter will be called every
  * time there is a write to the spreadsheet for a value in this field to write the value with
  * a link to the calculated URL from calcUrlFn.
- * @param {Function} calcUrlFn - the function that calculates the URL for a value
+ * @param {Function} calcUrlFn - the function that calculates the URL for a value. It takes a single parameter that is the value for the cell.
  * @return {RichTextConverter} A converter to rich text value with the calculated URL as a link
  */
 function getUrlConverter(calcUrlFn) {
-  return ExternalCalls_.newUrlConverter(calcUrlFn);
+  return (value) => {
+    const safeValue = (value == null || value == undefined) ? "" : value;
+    const url = calcUrlFn(value);
+    return SpreadsheetApp.newRichTextValue().setText(safeValue).setLinkUrl(url).build();
+  }
 }
 
-/** The default converter - doesn't need to be called by the  */
+/** The default converter - will be used for any key that doesn't have a converter provided */
 function getRichText_(value) {
   const safeValue = (value == null || value == undefined) ? "" : value;
-  return ExternalCalls_.newRichTextValue(safeValue);
+  return SpreadsheetApp.newRichTextValue().setText(safeValue).build();
 }
 
 /**

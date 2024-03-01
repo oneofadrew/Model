@@ -45,7 +45,7 @@ class Dao_ {
     let keyValue = values[0][0].getText();
     
     // grab the document lock for read and write consistency
-    let lock = ExternalCalls_.getDocumentLock();
+    let lock = LockService.getDocumentLock();
     lock.waitLock(10000);
 
     //if this requires a generated key and the key value isn't set, generate the key
@@ -70,7 +70,7 @@ class Dao_ {
     this.SHEET.getRange(this.START_COL+row + ":" + this.END_COL+row).setRichTextValues(values);
     
     // and we are done
-    ExternalCalls_.spreadsheetFlush();
+    SpreadsheetApp.flush();
     lock.releaseLock();
     model["row"] = row;
     return this.ENRICHER ? this.ENRICHER(model) : model;
@@ -86,7 +86,7 @@ class Dao_ {
     }
 
     // get the lock - we need to do this before any reads to guarantee both read and write consistency
-    let lock = ExternalCalls_.getDocumentLock();
+    let lock = LockService.getDocumentLock();
     lock.waitLock(10000);
 
     // get a map of the existing keys. in the sheet
@@ -134,7 +134,7 @@ class Dao_ {
     }
 
     // and we are done
-    ExternalCalls_.spreadsheetFlush();
+    SpreadsheetApp.flush();
     lock.releaseLock();
   }
 
