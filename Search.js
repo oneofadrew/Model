@@ -36,5 +36,5 @@ function newSearch() {
  * @return {[Object]} the filtered down list of objects based on the search terms provided.
  */
 function runSearch(search, models) {
-  return models.filter(model => Object.keys(search.terms).reduce((found, key) => found && (model[key] == search.terms[key]), true));
+  return models.filter(model => Object.keys(search.terms).reduce((found, key) => found && (model[key] === search.terms[key]), true));
 }

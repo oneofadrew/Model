@@ -6,9 +6,9 @@
     "libraries": [
       {
         "userSymbol": "Test",
-        "version": "1",
         "libraryId": "1TMw5iSpWrUBgGH40oGlHDIchcyjeUwLZWaoO2F8YWhPBVZS-5TCBnqmj",
-        "developmentMode": false
+        "version": "0",
+        "developmentMode": true
       }
     ]
   }

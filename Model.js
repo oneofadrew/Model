@@ -11,7 +11,7 @@
  */
 function getUrlConverter(calcUrlFn) {
   return (value) => {
-    const safeValue = (value == null || value == undefined) ? "" : value;
+    const safeValue = (value === null || value === undefined) ? "" : value;
     const url = calcUrlFn(value);
     return SpreadsheetApp.newRichTextValue().setText(safeValue).setLinkUrl(url).build();
   }
@@ -19,7 +19,7 @@ function getUrlConverter(calcUrlFn) {
 
 /** The default converter - will be used for any key that doesn't have a converter provided */
 function getRichText_(value) {
-  const safeValue = (value == null || value == undefined) ? "" : value;
+  const safeValue = (value === null || value === undefined) ? "" : value;
   return SpreadsheetApp.newRichTextValue().setText(safeValue).build();
 }
 
@@ -30,24 +30,24 @@ function getModelValues_(model, keys, converters) {
   return keys.map(key => converters[key](model[key]));
 }
 
-function getFirstEmptyRow_(sheet, col) {
-  return findKey_(sheet, "", col);
+function getFirstEmptyRow_(sheet, col, row) {
+  return findKey_(sheet, "", col, row);
 }
 
-function findKey_(sheet, key, col) {
-  const column = sheet.getRange(col+':'+col);
+function findKey_(sheet, key, col, row) {
+  const column = sheet.getRange(`${col}${row}:${col}`);
   const values = column.getValues(); // get all data in one call
-  const keysByPos = values.map((value, i) => [i, value[0]]);
-  const pos = keysByPos.filter(value => value[1] == key);
+  const keysByPos = values.map((value, i) => [i+row, value[0]]);
+  const pos = keysByPos.filter(value => value[1] === key);
 
   //if the key is falsey we looking for the first empty row here
   //so could be multiple records from the filter - just return
   //the first position found
-  if (!key) return pos[0][0] + 1;
+  if (!key) return pos[0][0];
 
   //we are looking for a specific key, check there is only one
   //and return its position
-  if (pos.length == 1) return pos[0][0] + 1;
+  if (pos.length === 1) return pos[0][0];
 
   //no key found - throw an error
   throw new Error(`Could not find '${key}'`);
