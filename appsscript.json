@@ -7,8 +7,8 @@
       {
         "userSymbol": "Test",
         "libraryId": "1TMw5iSpWrUBgGH40oGlHDIchcyjeUwLZWaoO2F8YWhPBVZS-5TCBnqmj",
-        "version": "0",
-        "developmentMode": true
+        "version": "2",
+        "developmentMode": false
       }
     ]
   }

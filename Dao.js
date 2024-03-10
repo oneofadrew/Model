@@ -17,7 +17,7 @@ class Dao_ {
 
     this.START_ROW = startRow;
 
-    this.KEY_COLS_MAP = getCellColMap_(this.START_COL, this.KEYS);
+    this.KEY_COLS_MAP = getKeyColMap_(this.START_COL, this.KEYS);
     this.END_COL = calculateEndColumn_(startCol, keys.length);
     
     this.ENRICHER = options["enricher"];
@@ -28,19 +28,25 @@ class Dao_ {
 
     const safeFormulas = options["formulas"] ? options["formulas"] : {};
     this.FORMULAS = Object.keys(safeFormulas).reduce((fObj, key) => {
-        const f = buildFormula_(safeFormulas[key], this.KEY_COLS_MAP);
+        const f = processStringTemplate_(safeFormulas[key], this.KEY_COLS_MAP);
         const formula = f.substring(0,1) === "=" ? f : `=${f}`;
         return Object.assign(fObj, {[key] : formula})
       }, {}
     );
   }
 
+  /**
+   * Creates a model object from a row dataset. The row can also be provided to include in the object.
+   */
   build(values, row) {
     const start = row ? {"row": row} : {};
     const model = this.KEYS.reduce((model, key, i) => Object.assign(model, {[key]: values[i]}), start);
     return this.ENRICHER ? this.ENRICHER(model) : model;
   }
 
+  /**
+   * 
+   */
   findAll() {
     const row = this.findLastRow();
     if (this.START_ROW > row) return [];
@@ -48,17 +54,26 @@ class Dao_ {
     return values.map((value, i) => this.build(value, this.START_ROW + Number(i)));
   }
   
+  /**
+   * 
+   */
   findByKey(key) {
     let row = findKey_(this.SHEET, key, this.PK_COL, this.START_ROW);
     return this.findByRow(row);
   }
   
+  /**
+   * 
+   */
   findByRow(row) {
     let values = this.SHEET.getRange(`${this.START_COL}${row}:${this.END_COL}${row}`).getValues();
     if (!values[0][this.PKI]) throw new Error(`Could not find model at row ${row}`)
     return this.build(values[0], row);
   }
   
+  /**
+   * 
+   */
   save(model) {
     // flatten to model values for the record
     let values = [getModelValues_(model, this.KEYS, this.CONVERTERS)];
@@ -99,7 +114,7 @@ class Dao_ {
     // add any formulas
     const substitutes = buildSubstitutes_(row, this.START_ROW);
     Object.keys(this.FORMULAS).forEach((key) => {
-      const formula = [buildFormula_(this.FORMULAS[key], substitutes)];
+      const formula = [processStringTemplate_(this.FORMULAS[key], substitutes)];
       const cell = this.SHEET.getRange(`${this.KEY_COLS_MAP[`[${key}]`]}${row}`);
       cell.setValue(formula);
     });
@@ -110,6 +125,9 @@ class Dao_ {
     return this.findByKey(keyValue);
   }
   
+  /**
+   * 
+   */
   bulkSave(models) {
     // flatten the models to a 2D array
     const values = models.map(model => getModelValues_(model, this.KEYS, this.CONVERTERS));
@@ -159,7 +177,7 @@ class Dao_ {
       //add the formulas
       const substitutesList = rows.map(row => buildSubstitutes_(row, this.START_ROW));
       Object.keys(this.FORMULAS).forEach((key) => {
-        const formulas = substitutesList.map(substitutes => [buildFormula_(this.FORMULAS[key], substitutes)]);
+        const formulas = substitutesList.map(substitutes => [processStringTemplate_(this.FORMULAS[key], substitutes)]);
         const range = this.SHEET.getRange(`${this.KEY_COLS_MAP[`[${key}]`]}${rows[0]}:${this.KEY_COLS_MAP[`[${key}]`]}${rows[rows.length-1]}`);
         range.setValues(formulas);
       });
@@ -178,7 +196,7 @@ class Dao_ {
       //add the formulas
       const substitutesList = rows.map(row => buildSubstitutes_(row, this.START_ROW));
       Object.keys(this.FORMULAS).forEach((key) => {
-        const formulas = substitutesList.map(substitutes => [buildFormula_(this.FORMULAS[key], substitutes)]);
+        const formulas = substitutesList.map(substitutes => [processStringTemplate_(this.FORMULAS[key], substitutes)]);
         const range = this.SHEET.getRange(`${this.KEY_COLS_MAP[`[${key}]`]}${rows[0]}:${this.KEY_COLS_MAP[`[${key}]`]}${rows[rows.length-1]}`);
         range.setValues(formulas);
       });
@@ -189,6 +207,9 @@ class Dao_ {
     lock.releaseLock();
   }
 
+  /**
+   * 
+   */
   clear() {
     // get the lock - we need to do this before any reads to guarantee both read and write consistency
     let lock = LockService.getDocumentLock();
@@ -202,10 +223,16 @@ class Dao_ {
     lock.releaseLock();
   }
   
+  /**
+   * 
+   */
   findLastRow() {
     return getFirstEmptyRow_(this.SHEET, this.PK_COL, this.START_ROW) - 1;
   }
   
+  /**
+   * 
+   */
   search(terms) {
     let models = this.findAll();
     return runSearch(terms, models);
@@ -260,12 +287,17 @@ function buildOptions(enricher, sequence, richTextConverters, formulas) {
 function inferDao(sheet, primaryKey, options, startCol="A", startRow=1) {
   const safeOptions = options ? options : {};
   const values = sheet.getRange(`${startRow}:${startRow}`).getValues();
-  const metadata = inferMetadata_(values, startCol, startRow);
+  const metadata = inferMetadata_(values, startCol);
   const pk = primaryKey ? primaryKey : metadata.keys[0].slice(0);
-  return createDao(sheet, metadata.keys, pk, metadata.startCol, metadata.startRow, safeOptions);
+  return createDao(sheet, metadata.keys, pk, metadata.startCol, startRow+1, safeOptions);
 }
 
-function inferMetadata_(values, col, row) {
+/**
+ * Looks at a single row dataset of values and tries to infer the startCol and keys properties of a DAO.
+ * The logic will start at the column reference provided and look left until it finds the first populated
+ * cell. It will then continue until it finds the next empty cell.
+ */
+function inferMetadata_(values, col) {
   //where do we start having header values
   let cols = getColumnReferences_();
   let startCol = cols.indexOf(col);
@@ -283,7 +315,6 @@ function inferMetadata_(values, col, row) {
 
   //work out the start column reference
   metadata["startCol"] = cols[startCol];
-  metadata["startRow"] = row+1;
 
   //get the header values from the header row
   let keys = values[0].slice(startCol, endCol);
@@ -293,45 +324,4 @@ function inferMetadata_(values, col, row) {
 
   //return the inferred metadata
   return metadata;
-}
-
-function buildSubstitutes_(row, startRow) {
-  return {
-    "[firstRow]":startRow,
-    "[previousRow]":row-1,
-    "[row]":row,
-  };
-}
-
-function buildFormula_(fTemplate, substitutes) {
-  return Object.keys(substitutes).reduce((temp, k) => {return temp.replaceAll(k, substitutes[k])}, fTemplate);
-}
-
-function toCamelCase_(str) {
-  const words = str.trim().split(/\s+/);
-  return words.map((word, i) => {
-    if (i === 0) return word.toLowerCase();
-    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-  }).join('');
-}
-
-function getCellColMap_(startCol, keys) {
-  const allCols = getColumnReferences_();
-  const start = allCols.indexOf(startCol);
-  const cols = allCols.slice(start, start + keys.length);
-  return keys.reduce((refsByKey, key, i) => {return Object.assign(refsByKey, {[`[${key}]`]: cols[i]})}, {});
-}
-
-function calculateEndColumn_(startCol, length) {
-  let cols = getColumnReferences_();
-  let startIndex = cols.indexOf(startCol);
-  let endIndex = startIndex + length - 1;
-  if (startIndex === -1) throw new Error(`Invalid startCol '${startCol}' provided.`);
-  if (endIndex > 701) throw new Error('The Model library only supports models that go up to column ZZ');
-  return cols[endIndex]; 
-}
-
-function getColumnReferences_() {
-  let cols = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  return cols.concat(cols.map(col1 => cols.map(col2 => `${col1}${col2}`)).flat(1));
 }

@@ -10,20 +10,20 @@ function runTests() {
 
 function getBuilderSuite_() {
   let suite = Test.newTestSuite("Builders")
-    .addTest(testGetCellColMap_)
+    .addTest(testGetKeyColMap_)
     .addTest(testCalculateEndCol_);
   return suite;
 }
 
-function testGetCellColMap_() {
+function testGetKeyColMap_() {
   const keys = ["key1", "key2", "key3", "key4", "key5", "key6"];
   const mapKeys = ["[key1]", "[key2]", "[key3]", "[key4]", "[key5]", "[key6]"];
   const result1 = ["A", "B", "C", "D", "E", "F"];
   const result2 = ["F", "G", "H", "I", "J", "K"];
 
-  cellColMap1 = getCellColMap_("A", keys);
+  cellColMap1 = getKeyColMap_("A", keys);
   mapKeys.forEach((key, i) => Test.isEqual(cellColMap1[key], result1[i]));
-  cellColMap2 = getCellColMap_("F", keys);
+  cellColMap2 = getKeyColMap_("F", keys);
   mapKeys.forEach((key, i) => Test.isEqual(cellColMap2[key], result2[i]));
 }
 
@@ -85,7 +85,7 @@ function getDaoSuite_() {
     .addTest(testBuildEnrichedNoRow_)
     .addTest(testInferMetadata_)
     .addTest(testBuildSubstitutes_)
-    .addTest(testBuildFormula_)
+    .addTest(testProcessStringTemplate_)
     .addTest(testToCamelCase_);
   return suite;
 }
@@ -227,15 +227,15 @@ function testBuildSubstitutes_() {
   Test.isEqual(subs3["[row]"], 23);
 }
 
-function testBuildFormula_() {
+function testProcessStringTemplate_() {
   const substitutes = buildSubstitutes_(10, 2);
 
   const fTemplate1 = '=row(A[row]) + col(A[previousRow])';
-  const formula1 = buildFormula_(fTemplate1, substitutes);
+  const formula1 = processStringTemplate_(fTemplate1, substitutes);
   Test.isEqual(formula1, '=row(A10) + col(A9)');
 
   const fTemplate2 = '=sum(A[firstRow]:A[previousRow])';
-  const formula2 = buildFormula_(fTemplate2, substitutes);
+  const formula2 = processStringTemplate_(fTemplate2, substitutes);
   Test.isEqual(formula2, '=sum(A2:A9)');
 }
 
@@ -251,29 +251,4 @@ function testToCamelCase_() {
 
 
 function test() {
-  const keyColsMap = {"[key1]" : "A", "[key2]" : "B", "[key3]" : "C", "[key4]" : "D", "[key5]" : "E"};
-  const formulas = {"key2" : "=[key1][row]+[key3][row]", "key4" : "$G$1 + [key4][previousRow] + [key3][row]"};
-  const mappedFormulas = Object.keys(formulas).reduce((fObj, fKey) => {
-      const f = buildFormula_(formulas[fKey], keyColsMap)[0];
-      const formula = f.substring(0,1) === "=" ? f : `=${f}`;
-      return Object.assign(fObj, {[fKey] : formula})
-    }, {}
-  );
-
-  const row = 23;
-
-  const substitutes = buildSubstitutes_(row, 2);
-  Object.keys(mappedFormulas).forEach((key) => {
-    const formula = buildFormula_(mappedFormulas[key], substitutes);
-    const cell = `${keyColsMap[key]}${row}`;
-    Logger.log(`Putting formula ${formula} into cell ${cell}`);
-  });
-
-  const rows = [23, 24, 25, 26, 27];
-  const substitutesList = rows.map(row => buildSubstitutes_(row, 2));
-  Object.keys(mappedFormulas).forEach((key) => {
-    const formulas = substitutesList.map(substitutes => buildFormula_(mappedFormulas[key], substitutes));
-    const range = `${keyColsMap[key]}${rows[0]}:${keyColsMap[key]}${rows[rows.length-1]}:`;
-    Logger.log(`Putting formulas ${formulas} into range ${range}`);
-  });
 }
