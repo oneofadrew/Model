@@ -7,8 +7,12 @@
       {
         "userSymbol": "Test",
         "libraryId": "1TMw5iSpWrUBgGH40oGlHDIchcyjeUwLZWaoO2F8YWhPBVZS-5TCBnqmj",
-        "version": "2",
-        "developmentMode": false
+        "version": "3"
+      },
+      {
+        "userSymbol": "Log",
+        "libraryId": "13RAf81luI1DJwKXIeWvK2daYsTN2Rnl2IE1oY_j156tEnNaVaXdRlg9O",
+        "version": "2"
       }
     ]
   }

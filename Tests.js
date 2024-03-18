@@ -17,14 +17,13 @@ function getBuilderSuite_() {
 
 function testGetKeyColMap_() {
   const keys = ["key1", "key2", "key3", "key4", "key5", "key6"];
-  const mapKeys = ["[key1]", "[key2]", "[key3]", "[key4]", "[key5]", "[key6]"];
   const result1 = ["A", "B", "C", "D", "E", "F"];
   const result2 = ["F", "G", "H", "I", "J", "K"];
 
   cellColMap1 = getKeyColMap_("A", keys);
-  mapKeys.forEach((key, i) => Test.isEqual(cellColMap1[key], result1[i]));
+  keys.forEach((key, i) => Test.isEqual(cellColMap1[key], result1[i]));
   cellColMap2 = getKeyColMap_("F", keys);
-  mapKeys.forEach((key, i) => Test.isEqual(cellColMap2[key], result2[i]));
+  keys.forEach((key, i) => Test.isEqual(cellColMap2[key], result2[i]));
 }
 
 function testCalculateEndCol_() {
@@ -109,11 +108,11 @@ function testCreateDao_() {
   Test.isEqual(dao.START_COL, "G");
   Test.isEqual(dao.SCI, 6);
   Test.isEqual(dao.START_ROW, 3);
-  Test.isEqual(dao.KEY_COLS_MAP, {"[key1]": "G", "[key2]": "H", "[key3]": "I", "[key4]": "J"});
+  Test.isEqual(dao.KEY_COLS_MAP, {"key1": "G", "key2": "H", "key3": "I", "key4": "J"});
   Test.isEqual(dao.END_COL, "J");
   Test.isEqual(dao.ENRICHER, enricher);
   Test.isEqual(dao.SEQUENCE, sequence);
-  Test.isEqual(Object.keys(dao.CONVERTERS).length, keys.length);
+  Test.isEqual(Object.keys(dao.CONVERTERS).length, 1);
   Test.isEqual(dao.CONVERTERS["key4"], converter);
   Test.isTrue(dao.CONVERTERS["key4"]());
   Test.isEqual(Object.keys(dao.FORMULAS).length, 2);

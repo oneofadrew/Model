@@ -1,3 +1,33 @@
+//---------------------------------------------------------------------------------------
+// Model - a library for turning a google sheet into a simple data table for app script
+// Copyright ⓒ 2022 Drew Harding
+// All rights reserved.
+//
+// Script ID: 1pD0LxUmm1NHDrz9fdIikCCOZ_eVS_LP-qgsR5EXReXjh8CLj2xs_I7jF
+// GitHub Repo: https://github.com/oneofadrew/Model
+//---------------------------------------------------------------------------------------
+
+/*
+ * Rich Text Converters
+ */
+
+const ModelLogger = Log.newLog("Model.Util");
+const DaoLogger = Log.newLog("Model.Dao");
+const SearchLogger = Log.newLog("Model.Search");
+const LogConfig = {"Default": {"level":"INFO"}};
+
+/**
+ * Allows for configuration of the Log library.
+ * Script ID: 13RAf81luI1DJwKXIeWvK2daYsTN2Rnl2IE1oY_j156tEnNaVaXdRlg9O
+ * Code: https://github.com/oneofadrew/Log
+ */
+function configureLog(config) {
+  ModelLogger.configure(config);
+  DaoLogger.configure(config);
+  SearchLogger.configure(config);
+}
+configureLog(LogConfig);
+
 /*
  * Rich Text Converters
  */
@@ -13,14 +43,9 @@ function getUrlConverter(calcUrlFn) {
   return (value) => {
     const safeValue = (value === null || value === undefined) ? "" : value;
     const url = calcUrlFn(value);
+    ModelLogger.debug(`URL for '%s' calculated to be %s`, value, url);
     return SpreadsheetApp.newRichTextValue().setText(safeValue).setLinkUrl(url).build();
   }
-}
-
-/** The default converter - will be used for any key that doesn't have a converter provided */
-function getRichText_(value) {
-  const safeValue = (value === null || value === undefined) ? "" : value;
-  return SpreadsheetApp.newRichTextValue().setText(safeValue).build();
 }
 
 /*
@@ -30,37 +55,42 @@ function getRichText_(value) {
 /**
  * 
  */
-function getModelValues_(model, keys, converters) {
-  return keys.map(key => converters[key](model[key]));
+function getModelValues_(model, keys) {
+  let values = [];
+  for (let i=0;i<keys.length;i++) values[values.length] = model[keys[i]];
+  return values;
 }
 
 /**
  * Get's the first empty row below the cell at the column and row provided.
  */
-function getFirstEmptyRow_(sheet, col, row) {
-  return findKey_(sheet, "", col, row);
+function getFirstEmptyRow_(sheet) {
+  return sheet.getDataRange().getLastRow() + 1;
 }
 
 /**
  * Looks for a unique value below the cell at the column and row provided.
  */
 function findKey_(sheet, key, col, row) {
-  const column = sheet.getRange(`${col}${row}:${col}`);
-  const values = column.getValues(); // get all data in one call
-  const keysByPos = values.map((value, i) => [i+row, value[0]]);
-  const pos = keysByPos.filter(value => value[1] === key);
+  ModelLogger.trace(`Running findKey_(sheet:'%s', key:'%s', col:'%s', row:'%s')`, sheet.getName(), key, col, row);
+  //account for difference between index and range row values
+  row = row - 1;
+  ModelLogger.trace("Getting all the values");
+  const values = sheet.getDataRange().getValues();
+  ModelLogger.trace("All the values have been retrieved");
 
-  //if the key is falsey we looking for the first empty row here
-  //so could be multiple records from the filter - just return
-  //the first position found
-  if (!key) return pos[0][0];
-
-  //we are looking for a specific key, check there is only one
-  //and return its position
-  if (pos.length === 1) return pos[0][0];
-
-  //no key found - throw an error
-  throw new Error(`Could not find '${key}'`);
+  let first = -1;
+  let total = 0;
+  ModelLogger.trace("Looking for key '%s'...", key);
+  for (let i=row;i<values.length;i++) {
+    if (values[i][col] === key) {
+      total++;
+      if (first<0) first = i+1;
+    }
+  }
+  ModelLogger.trace("Found %s records for key '%s' at row '%s'", total, key, first);
+  if (total === 1) return first;
+  else throw new Error(`Could not find '${key}'`)
 }
 
 /**
@@ -70,6 +100,7 @@ function findKey_(sheet, key, col, row) {
 function incrementKey_(sequence, increment = 1) {
   const values = sequence.getValues();
   const newValue = values[0][0] + increment;
+  ModelLogger.debug(`Incrementing sequence from '%s' to '%s'`, values[0][0], newValue);
   sequence.setValues([[newValue]]);
   return newValue;
 }
@@ -111,7 +142,7 @@ function getKeyColMap_(startCol, keys) {
   const allCols = getColumnReferences_();
   const start = allCols.indexOf(startCol);
   const cols = allCols.slice(start, start + keys.length);
-  return keys.reduce((refsByKey, key, i) => {return Object.assign(refsByKey, {[`[${key}]`]: cols[i]})}, {});
+  return keys.reduce((refsByKey, key, i) => {return Object.assign(refsByKey, {[key]: cols[i]})}, {});
 }
 
 /**
