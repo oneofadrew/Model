@@ -77,7 +77,10 @@ function testRunSearch_() {
 
 function getDaoSuite_() {
   let suite = Test.newTestSuite("Dao")
-    .addTest(testCreateDao_)
+    .addTest(testCreateDaoHappyPath_)
+    .addTest(testCreateDaoUnhappyPath1_)
+    .addTest(testCreateDaoUnhappyPath2_)
+    .addTest(testCreateDaoUnhappyPath3_)
     .addTest(testBuildNotEnrichedWithRow_)
     .addTest(testBuildNotEnrichedNoRow_)
     .addTest(testBuildEnrichedWithRow_)
@@ -89,7 +92,7 @@ function getDaoSuite_() {
   return suite;
 }
 
-function testCreateDao_() {
+function testCreateDaoHappyPath_() {
   const keys = ["key1", "key2", "key3", "key4"];
   const primaryKey = "key2";
   const sheet = "mySheet";
@@ -98,7 +101,7 @@ function testCreateDao_() {
   const converter = () => {return true;};
   const converters = {"key4": converter};
   const formulas = {"key2" : "=[key1][row]+[key3][row]", "key4" : "$A$1 + [key4][previousRow] + [key3][row]"};
-  const options = buildOptions(enricher, sequence, converters, formulas, false);
+  const options = buildOptions(enricher, sequence, converters, formulas);
   const dao = createDao(sheet, keys, primaryKey, "G", 3, options);
   Test.isEqual(dao.SHEET, sheet);
   Test.isEqual(dao.KEYS, keys);
@@ -118,6 +121,32 @@ function testCreateDao_() {
   Test.isEqual(Object.keys(dao.FORMULAS).length, 2);
   Test.isEqual(dao.FORMULAS["key2"], "=G[row]+I[row]");
   Test.isEqual(dao.FORMULAS["key4"], "=$A$1 + J[previousRow] + I[row]");
+}
+
+function testCreateDaoUnhappyPath1_() {
+  const keys = ["key1", "key2", "key3", "key4"];
+  const primaryKey = "notKey";
+  const sheet = "mySheet";
+  Test.willFail(()=>createDao(sheet, keys, primaryKey, "G", 3, null), "Primary key 'notKey' is not one of the keys to use: [key1,key2,key3,key4]");
+}
+
+function testCreateDaoUnhappyPath2_() {
+  const keys = ["key1", "key2", "key3", "key4"];
+  const primaryKey = "key2";
+  const sheet = "mySheet";
+  const converter = () => {return true;};
+  const converters = {"notKey": converter};
+  const options = buildOptions(null, null, converters, null);
+  Test.willFail(()=>createDao(sheet, keys, primaryKey, "G", 3, options), "Key 'notKey' in converters does not exist in keys [key1,key2,key3,key4]");
+}
+
+function testCreateDaoUnhappyPath3_() {
+  const keys = ["key1", "key2", "key3", "key4"];
+  const primaryKey = "key2";
+  const sheet = "mySheet";
+  const formulas = {"notKey" : "=[key1][row]+[key3][row]", "key4" : "$A$1 + [key4][previousRow] + [key3][row]"};
+  const options = buildOptions(null, null, null, formulas);
+  Test.willFail(()=>createDao(sheet, keys, primaryKey, "G", 3, options), "Key 'notKey' in formulas does not exist in keys [key1,key2,key3,key4]");
 }
 
 function testBuildNotEnrichedWithRow_() {

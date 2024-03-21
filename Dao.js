@@ -3,7 +3,7 @@
  */
 class Dao_ {
   constructor(sheet, keys, primaryKey, startCol=A, startRow=2, options) {
-    DaoLogger.trace("sheet:'%s', keys:'%s', pk:'%s', startCol:'%s', startRow:'%s'", sheet.getName(), keys, primaryKey, startCol, startRow);
+    DaoLogger.trace("keys:'%s', pk:'%s', startCol:'%s', startRow:'%s'", keys, primaryKey, startCol, startRow);
     const colRefs = getColumnReferences_();
     const safeOptions = options ? options : {};
 
@@ -12,6 +12,8 @@ class Dao_ {
 
     this.START_COL = startCol;
     this.SCI = colRefs.indexOf(startCol);
+
+    if (primaryKey && keys.indexOf(primaryKey) < 0) throw new Error(`Primary key '${primaryKey}' is not one of the keys to use: [${keys}]`);
 
     this.PK = primaryKey ? primaryKey : keys[0];
     this.PKI = keys.indexOf(this.PK);
@@ -28,10 +30,14 @@ class Dao_ {
     this.ENRICHER = safeOptions["enricher"];
     this.SEQUENCE = safeOptions["sequence"];
     this.CONVERTERS = safeOptions["richTextConverters"] ? safeOptions["richTextConverters"] : {};
+    Object.keys(this.CONVERTERS).forEach(key => {
+      if (keys.indexOf(key)<0) throw new Error(`Key '${key}' in converters does not exist in keys [${keys}]`);
+    });
 
     const safeFormulas = safeOptions["formulas"] ? safeOptions["formulas"] : {};
     const subs = Object.keys(this.KEY_COLS_MAP).reduce((obj, key) => { return Object.assign(obj, {[`[${key}]`]: this.KEY_COLS_MAP[key]})}, {});
     this.FORMULAS = Object.keys(safeFormulas).reduce((fObj, key) => {
+        if (keys.indexOf(key)<0) throw new Error(`Key '${key}' in formulas does not exist in keys [${keys}]`);
         const f = processStringTemplate_(safeFormulas[key], subs);
         const formula = f.substring(0,1) === "=" ? f : `=${f}`;
         return Object.assign(fObj, {[key] : formula})
