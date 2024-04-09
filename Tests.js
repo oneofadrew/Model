@@ -1,3 +1,13 @@
+//---------------------------------------------------------------------------------------
+// Unit tests for the Model library. These should be run along with every change to the
+// library to verify nothing has broken. Functional tests and performance tests are managed
+// in https://docs.google.com/spreadsheets/d/1zqMXxdNYyTmnXPCXdoQyrj3fPg1xQApBlMpZr-BjLuk
+//
+// Before deployment this script should be deleted and the Test library removed from the
+// dependency list. After deployment it should be reinstated in the app script project
+// from version control.
+//---------------------------------------------------------------------------------------
+
 function runTests() {
   let suite = Test.newTestSuite("All Tests")
     .addSuite(getBuilderSuite_())
