@@ -7,10 +7,6 @@
 // GitHub Repo: https://github.com/oneofadrew/Model
 //---------------------------------------------------------------------------------------
 
-/*
- * Rich Text Converters
- */
-
 const ModelLogger = Log.newLog("Model.Util");
 const DaoLogger = Log.newLog("Model.Dao");
 const SearchLogger = Log.newLog("Model.Search");
@@ -53,7 +49,7 @@ function getUrlConverter(calcUrlFn) {
  */
 
 /**
- * 
+ * Converts the model object into an array of values in the order of the defined keys.
  */
 function getModelValues_(model, keys) {
   let values = [];

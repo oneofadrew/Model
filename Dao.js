@@ -55,7 +55,7 @@ class Dao_ {
   }
 
   /**
-   * 
+   * Returns all of the model objects available from the sheet.
    */
   findAll() {
     const row = this.findLastRow();
@@ -67,7 +67,7 @@ class Dao_ {
   }
   
   /**
-   * 
+   * Returns the model object from the sheet identified by the primary key.
    */
   findByKey(key) {
     let row = findKey_(this.SHEET, key, this.PKCI, this.START_ROW);
@@ -75,7 +75,7 @@ class Dao_ {
   }
   
   /**
-   * 
+   * Returns the model object from the specified row in the sheet.
    */
   findByRow(row) {
     let values = this.SHEET.getRange(`${this.START_COL}${row}:${this.END_COL}${row}`).getValues();
@@ -84,7 +84,8 @@ class Dao_ {
   }
   
   /**
-   * 
+   * Saves the model object. This will update if it already exists (according to primary key)
+   * and create if it doesn't.
    */
   save(model) {
     DaoLogger.trace(`Saving model`);
@@ -164,7 +165,9 @@ class Dao_ {
   }
   
   /**
-   * 
+   * Saves the list of model object. This will update if it already exists (according to primary key)
+   * and create if it doesn't. Bulk save optimises the operation by using set processing of objects
+   * in contiguous rows where possible.
    */
   bulkSave(models) {
     DaoLogger.debug(`Starting the bulk save by flattening models to values.`);
@@ -303,7 +306,7 @@ class Dao_ {
   }
 
   /**
-   * 
+   * Wipes the sheet leaving the title row.
    */
   clear() {
     // get the lock - we need to do this before any reads to guarantee both read and write consistency
@@ -332,14 +335,15 @@ class Dao_ {
   }
   
   /**
-   * 
+   * Returns the last row of the model object table.
    */
   findLastRow() {
     return getFirstEmptyRow_(this.SHEET) - 1;
   }
   
   /**
-   * 
+   * Convenience method to Run a search over all the objects in the sheet. Model.runSearch() can be
+   * used to run a more targeted search on a specific list of models if desired.
    */
   search(terms) {
     let models = this.findAll();
