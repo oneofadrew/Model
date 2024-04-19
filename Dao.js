@@ -33,6 +33,12 @@ class Dao_ {
     Object.keys(this.CONVERTERS).forEach(key => {
       if (keys.indexOf(key)<0) throw new Error(`Key '${key}' in converters does not exist in keys [${keys}]`);
     });
+    /*
+    this.VALIDATIONS = safeOptions["dataValidations"] ? safeOptions["dataValidations"] : {};
+    Object.keys(this.VALIDATIONS).forEach(key => {
+      if (keys.indexOf(key)<0) throw new Error(`Key '${key}' in validations does not exist in keys [${keys}]`);
+    });
+    */
 
     const safeFormulas = safeOptions["formulas"] ? safeOptions["formulas"] : {};
     const subs = Object.keys(this.KEY_COLS_MAP).reduce((obj, key) => { return Object.assign(obj, {[`[${key}]`]: this.KEY_COLS_MAP[key]})}, {});
@@ -144,7 +150,6 @@ class Dao_ {
     DaoLogger.trace(`Now save the values to the range.`);
     range.setValues(values);
 
-    //todo - add any rich text
     DaoLogger.trace(`Add in any rich text.`);
     for (let key in this.CONVERTERS) {
       DaoLogger.trace(`Processing rich text converter for key '%s'.`, key);
@@ -156,6 +161,17 @@ class Dao_ {
       cell.setRichTextValue(richTextValue);
     }
     DaoLogger.trace(`Rich text all done.`);
+
+    /*
+    DaoLogger.trace(`Add in any validations.`);
+    for (let key in this.VALIDATIONS) {
+      DaoLogger.trace(`Getting the range for the data validation of key '%s'.`, key);
+      const cell = this.SHEET.getRange(`${this.KEY_COLS_MAP[key]}${row}`);
+      DaoLogger.trace(`Setting the data validation.`);
+      cell.setDataValidation(this.VALIDATIONS[key]);
+    }
+    DaoLogger.trace(`Validations all done.`);
+    */
     
     // and we are done
     DaoLogger.trace(`Flush and unlock.`);
@@ -375,14 +391,16 @@ function createDao(sheet, keys, primaryKey, startCol, startRow, options) {
  * @param {string} sequence - a named range for a single cell that contains a number that will be incremented as a sequenced ID for the data model.
  * @param {{function}} richTextConverters - an map of field names to functions that can takes a field value as an only parameter and returns a RichTextValue object.
  * @param {{string}} formulas - a map of field names to strings that define a sheet formula for use in all rows, for instance {"bill":"=[price][row]*[quantity][row]"}.
+ * @param {{DataValidation}} dataValidations - a map of field names to DataValidations that apply to the field.
  * @return {object} a map of options for use in the createDao(...) and inferDao(...) functions.
  */
-function buildOptions(enricher, sequence, richTextConverters, formulas) {
+function buildOptions(enricher, sequence, richTextConverters, formulas, dataValidations) {
   return {
     "enricher": enricher,
     "sequence": sequence,
     "richTextConverters": richTextConverters,
-    "formulas": formulas
+    "formulas": formulas,
+    "dataValidations": dataValidations
   };
 }
 
