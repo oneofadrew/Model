@@ -33,12 +33,10 @@ class Dao_ {
     Object.keys(this.CONVERTERS).forEach(key => {
       if (keys.indexOf(key)<0) throw new Error(`Key '${key}' in converters does not exist in keys [${keys}]`);
     });
-    /*
     this.VALIDATIONS = safeOptions["dataValidations"] ? safeOptions["dataValidations"] : {};
     Object.keys(this.VALIDATIONS).forEach(key => {
       if (keys.indexOf(key)<0) throw new Error(`Key '${key}' in validations does not exist in keys [${keys}]`);
     });
-    */
 
     const safeFormulas = safeOptions["formulas"] ? safeOptions["formulas"] : {};
     const subs = Object.keys(this.KEY_COLS_MAP).reduce((obj, key) => { return Object.assign(obj, {[`[${key}]`]: this.KEY_COLS_MAP[key]})}, {});
@@ -134,6 +132,15 @@ class Dao_ {
       throw new Error(`The row of the model (${model.row}) did not match the row of the model with primary key '${values[0][this.PKI]}' (${row})`);
     }
 
+    DaoLogger.trace(`Add in any data validations.`);
+    for (let key in this.VALIDATIONS) {
+      DaoLogger.trace(`Getting the range for the data validation of key '%s'.`, key);
+      const cell = this.SHEET.getRange(`${this.KEY_COLS_MAP[key]}${row}`);
+      DaoLogger.trace(`Setting the data validation.`);
+      cell.setDataValidation(this.VALIDATIONS[key]);
+    }
+    DaoLogger.trace(`Validations all done.`);
+
     // write the values for the record
     DaoLogger.trace(`Getting the record range for the model.`);
     const rangeRef = `${this.START_COL}${row}:${this.END_COL}${row}`;
@@ -161,17 +168,6 @@ class Dao_ {
       cell.setRichTextValue(richTextValue);
     }
     DaoLogger.trace(`Rich text all done.`);
-
-    /*
-    DaoLogger.trace(`Add in any validations.`);
-    for (let key in this.VALIDATIONS) {
-      DaoLogger.trace(`Getting the range for the data validation of key '%s'.`, key);
-      const cell = this.SHEET.getRange(`${this.KEY_COLS_MAP[key]}${row}`);
-      DaoLogger.trace(`Setting the data validation.`);
-      cell.setDataValidation(this.VALIDATIONS[key]);
-    }
-    DaoLogger.trace(`Validations all done.`);
-    */
     
     // and we are done
     DaoLogger.trace(`Flush and unlock.`);
@@ -247,6 +243,14 @@ class Dao_ {
     for (let i=0;i<updatedRecordSets.length;i++) {
       DaoLogger.trace(`Processing batch %s with %s records - start by getting the range`, i, updatedRecordSets[i]["values".length]);
       const firstRow = updatedRecordSets[i]["row"];
+
+      DaoLogger.trace(`Add in any data validations.`);
+      for (let key in this.VALIDATIONS) {
+        DaoLogger.trace(`Set the data validations for key '%s'.`, key);
+        const range = this.SHEET.getRange(`${this.KEY_COLS_MAP[key]}${firstRow}:${this.KEY_COLS_MAP[key]}${firstRow+updatedRecordSets[i]["values"].length-1}`);
+        range.setDataValidation(this.VALIDATIONS[key]);
+      }
+
       const rangeRef = `${this.START_COL}${firstRow}:${this.END_COL}${firstRow+updatedRecordSets[i]["values"].length-1}`;
       const range = this.SHEET.getRange(rangeRef);
 
@@ -263,7 +267,6 @@ class Dao_ {
       DaoLogger.debug(`Save the batch.`);
       range.setValues(updatedRecordSets[i]["values"])
 
-      //todo - add the rich text
       DaoLogger.trace(`Add in any rich text converters.`);
       for (let key in this.CONVERTERS) {
         DaoLogger.trace(`Processing rich text converter for key '%s'.`, key);
@@ -286,6 +289,14 @@ class Dao_ {
     // save the new records
     if (newValues.length > 0) {
       DaoLogger.trace(`Saving '%s' new models - start by getting the range.`, newValues.length);
+
+      DaoLogger.trace(`Add in any data validations.`);
+      for (let key in this.VALIDATIONS) {
+        DaoLogger.trace(`Set the data validations for key '%s'.`, key);
+        const range = this.SHEET.getRange(`${this.KEY_COLS_MAP[key]}${firstEmptyRow}:${this.KEY_COLS_MAP[key]}${firstEmptyRow+newValues.length-1}`);
+        range.setDataValidation(this.VALIDATIONS[key]);
+      }
+      
       const rangeRef = `${this.START_COL}${firstEmptyRow}:${this.END_COL}${firstEmptyRow+newValues.length-1}`;
       const newRange = this.SHEET.getRange(rangeRef);
 
@@ -340,7 +351,7 @@ class Dao_ {
       for (let i=0;i<formulas.length;i++) for (let j=0;j<formulas[i].length;j++) titles[i][j] = formulas[i][j] ? formulas[i][j] : titles[i][j];
     }
 
-    this.SHEET.getDataRange().clearContent();
+    this.SHEET.getDataRange().clear({"contentsOnly": true, "formatsOnly": true, "validationsOnly": true});
 
     if (this.START_ROW > 0) titleRange.setValues(titles)
 
