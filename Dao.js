@@ -83,7 +83,7 @@ class Dao_ {
    */
   findByRow(row) {
     let values = this.SHEET.getRange(`${this.START_COL}${row}:${this.END_COL}${row}`).getValues();
-    if (!values[0][this.PKI]) throw new Error(`Could not find model at row ${row}`)
+    if (!values[0][this.PKI] && values[0][this.PKI] !== 0) throw new Error(`Could not find model at row ${row}`)
     return this.build(values[0], row);
   }
   
