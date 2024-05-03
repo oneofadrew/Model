@@ -236,6 +236,7 @@ class Dao_ {
         }
         lastRow = row;
       }
+      updatedRecordSets[updatedRecordSets.length] = recordSet;
     }
 
     //process each of the update record sets
