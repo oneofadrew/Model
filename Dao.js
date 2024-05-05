@@ -108,6 +108,7 @@ class Dao_ {
     //if this requires a generated key and the key value isn't set, generate the key
     keyValue = keyValue || !this.SEQUENCE ? keyValue : incrementKey_(this.SEQUENCE);
     model[this.KEYS[this.PKI]] = keyValue;
+    values[0][this.PKI] = keyValue;
 
     // try to find a record to update based on the key, otherwise we'll create a new record
     let row;
@@ -284,7 +285,10 @@ class Dao_ {
     if (this.SEQUENCE) {
       DaoLogger.debug(`Get the next sequence values for models to create.`);
       let lastKey = incrementKey_(this.SEQUENCE, newValues.length);
-      newValues = newValues.map((modelValues, i) => [(lastKey - newValues.length + i)].concat(modelValues.slice(1)));
+      newValues = newValues.map((modelValues, i) => {
+        modelValues[this.PKI] = lastKey - newValues.length + i;
+        return modelValues;
+      });
     }
 
     // save the new records
