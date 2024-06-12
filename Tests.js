@@ -1,4 +1,7 @@
 //---------------------------------------------------------------------------------------
+// Copyright ⓒ 2024 Drew Harding
+// All rights reserved.
+//---------------------------------------------------------------------------------------
 // Unit tests for the Model library. These should be run along with every change to the
 // library to verify nothing has broken. Functional tests and performance tests are managed
 // in https://docs.google.com/spreadsheets/d/1zqMXxdNYyTmnXPCXdoQyrj3fPg1xQApBlMpZr-BjLuk

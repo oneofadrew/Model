@@ -1,4 +1,7 @@
 //---------------------------------------------------------------------------------------
+// Copyright ⓒ 2024 Drew Harding
+// All rights reserved.
+//---------------------------------------------------------------------------------------
 // Model - a library for turning a google sheet into a simple data table for app script
 // Copyright ⓒ 2022 Drew Harding
 // All rights reserved.
@@ -7,10 +10,10 @@
 // GitHub Repo: https://github.com/oneofadrew/Model
 //---------------------------------------------------------------------------------------
 
-const ModelLogger = Log.newLog("Model.Util");
-const DaoLogger = Log.newLog("Model.Dao");
-const SearchLogger = Log.newLog("Model.Search");
-const LogConfig = {"Default": {"level":"INFO"}};
+const ModelLogger = Log.newLog("model.util");
+const DaoLogger = Log.newLog("model.dao");
+const SearchLogger = Log.newLog("model.search");
+Log.setConfig({"default": {"level":"INFO"}});
 
 /**
  * Allows for configuration of the Log library.
@@ -18,11 +21,9 @@ const LogConfig = {"Default": {"level":"INFO"}};
  * Code: https://github.com/oneofadrew/Log
  */
 function configureLog(config) {
-  ModelLogger.configure(config);
-  DaoLogger.configure(config);
-  SearchLogger.configure(config);
+  Log.setConfig(config);
+  Log.dumpConfig();
 }
-configureLog(LogConfig);
 
 /*
  * Rich Text Converters

@@ -1,3 +1,7 @@
+//---------------------------------------------------------------------------------------
+// Copyright ⓒ 2024 Drew Harding
+// All rights reserved.
+//---------------------------------------------------------------------------------------
 /**
  * A Data Access Object wraps up a set of functions to allow easily interactivity across a model
  */
@@ -286,7 +290,7 @@ class Dao_ {
       DaoLogger.debug(`Get the next sequence values for models to create.`);
       let lastKey = incrementKey_(this.SEQUENCE, newValues.length);
       newValues = newValues.map((modelValues, i) => {
-        modelValues[this.PKI] = lastKey - newValues.length + i;
+        modelValues[this.PKI] = lastKey - newValues.length + i + 1;
         return modelValues;
       });
     }
