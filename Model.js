@@ -36,19 +36,21 @@ function createDao(sheet, keys, primaryKey, startCol, startRow, options) {
  * when the model is returned/retrieved. Formulas can be complex and error prone due to the mental model associated with using them with a DAO. Where
  * your data is a function of the existing data within the object, consider using an enricher function instead.
  * @param {function} enricher - a function that takes a model object as an only parameter, enriches it with other data and then returns it for use.
- * @param {string} sequence - a named range for a single cell that contains a number that will be incremented as a sequenced ID for the data model.
+ * @param {{Range}} sequences - a map of field names to named ranges that each contains a single cell with a number that will be incremented as a sequence for field.
  * @param {{function}} richTextConverters - an map of field names to functions that can takes a field value as an only parameter and returns a RichTextValue object.
  * @param {{string}} formulas - a map of field names to strings that define a sheet formula for use in all rows, for instance {"bill":"=[price][row]*[quantity][row]"}.
  * @param {{DataValidation}} dataValidations - a map of field names to DataValidations that apply to the field.
+ * @param {[string]} uniqueKeys - an array of field names that should remain unique across every instance of the model.
  * @return {object} a map of options for use in the createDao(...) and inferDao(...) functions.
  */
-function buildOptions(enricher, sequence, richTextConverters, formulas, dataValidations) {
+function buildOptions(enricher, sequences, richTextConverters, formulas, dataValidations, uniqueKeys) {
   return {
     "enricher": enricher,
-    "sequence": sequence,
+    "sequences": sequences,
     "richTextConverters": richTextConverters,
     "formulas": formulas,
-    "dataValidations": dataValidations
+    "dataValidations": dataValidations,
+    "uniqueKeys": uniqueKeys
   };
 }
 

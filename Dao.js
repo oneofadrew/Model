@@ -32,11 +32,18 @@ class Dao_ {
     this.ECI = colRefs.indexOf(this.END_COL);
     
     this.ENRICHER = safeOptions["enricher"];
-    this.SEQUENCE = safeOptions["sequence"];
+
+    this.SEQUENCES = safeOptions["sequences"] ? safeOptions["sequences"] : {};
+    Object.keys(this.SEQUENCES).forEach(key => {
+      if (keys.indexOf(key)<0) throw new Error(`Key '${key}' in sequences does not exist in keys [${keys}]`);
+    });
+    this.PK_SEQUENCE = this.SEQUENCES[this.PK];
+
     this.CONVERTERS = safeOptions["richTextConverters"] ? safeOptions["richTextConverters"] : {};
     Object.keys(this.CONVERTERS).forEach(key => {
       if (keys.indexOf(key)<0) throw new Error(`Key '${key}' in converters does not exist in keys [${keys}]`);
     });
+
     this.VALIDATIONS = safeOptions["dataValidations"] ? safeOptions["dataValidations"] : {};
     Object.keys(this.VALIDATIONS).forEach(key => {
       if (keys.indexOf(key)<0) throw new Error(`Key '${key}' in validations does not exist in keys [${keys}]`);
@@ -51,6 +58,13 @@ class Dao_ {
         return Object.assign(fObj, {[key] : formula})
       }, {}
     );
+    
+    this.UNIQUE_KEYS = safeOptions["uniqueKeys"] ? safeOptions["uniqueKeys"] : [];
+    this.UNIQUE_KEYS.forEach(key => {
+      if (keys.indexOf(key)<0) throw new Error(`Key '${key}' in unique keys does not exist in keys [${keys}]`);
+    });
+    //the primary key must be unique - add it to the unique keys if it's not there.
+    if (this.UNIQUE_KEYS.indexOf(this.PK) < 0) this.UNIQUE_KEYS[this.UNIQUE_KEYS.length] = this.PK;
   }
 
   /*
@@ -110,7 +124,7 @@ class Dao_ {
     lock.waitLock(10000);
 
     //if this requires a generated key and the key value isn't set, generate the key
-    keyValue = keyValue || !this.SEQUENCE ? keyValue : incrementKey_(this.SEQUENCE);
+    keyValue = keyValue || !this.PK_SEQUENCE ? keyValue : incrementKey_(this.PK_SEQUENCE);
     model[this.KEYS[this.PKI]] = keyValue;
     values[0][this.PKI] = keyValue;
 
@@ -192,7 +206,7 @@ class Dao_ {
     const values = models.map(model => getModelValues_(model, this.KEYS));
 
     //todo - check for duplicate keys
-    if (!this.SEQUENCE) {}
+    if (!this.PK_SEQUENCE) {}
 
     // get the lock - we need to do this before any reads to guarantee both read and write consistency
     DaoLogger.debug(`Grab the document lock.`);
@@ -286,9 +300,9 @@ class Dao_ {
     }
 
     // if we need to create the keys then create them here
-    if (this.SEQUENCE) {
+    if (this.PK_SEQUENCE) {
       DaoLogger.debug(`Get the next sequence values for models to create.`);
-      let lastKey = incrementKey_(this.SEQUENCE, newValues.length);
+      let lastKey = incrementKey_(this.PK_SEQUENCE, newValues.length);
       newValues = newValues.map((modelValues, i) => {
         modelValues[this.PKI] = lastKey - newValues.length + i + 1;
         return modelValues;
