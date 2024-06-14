@@ -11,7 +11,7 @@
 // from version control.
 //---------------------------------------------------------------------------------------
 
-function runTests() {
+function runTests_() {
   let suite = Test.newTestSuite("All Tests")
     .addSuite(getBuilderSuite_())
     .addSuite(getSearchSuite_())

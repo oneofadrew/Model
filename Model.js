@@ -13,7 +13,66 @@
 const ModelLogger = Log.newLog("model.util");
 const DaoLogger = Log.newLog("model.dao");
 const SearchLogger = Log.newLog("model.search");
-Log.setConfig({"default": {"level":"INFO"}});
+
+
+/**
+ * Create a new Data Access Object from the properties provided. 
+ * @param {Sheet} sheet - the sheet that contains the data for the Data Access Object.
+ * @param {[string]} keys - the list of keys to use as the field names in the model object.
+ * @param {string} primaryKey - the field to use as the primary key for the Data Access Object (defaults to first key in the list).
+ * @param {string} startCol - the column to start looking for field names from (usually "A").
+ * @param {int} startRow - the row to use to start saving data. This should be the row after any header values if they exist (usually 2).
+ * @param {{object}} options - extra configuration options, documented by function Model.buildOptions(...).
+ * @return {Dao} a data access object that encapsulates the data access functions based on the properties provided.
+ */
+function createDao(sheet, keys, primaryKey, startCol, startRow, options) {
+  return new Dao_(sheet, keys, primaryKey, startCol, startRow, options);
+}
+
+/**
+ * Helper method to build the options.
+ * It's possible to define formula fields in a model by adding the formula string in a map against the field name for use in every row. Placeholders
+ * are surrounded by []. Valid placeholders are field names and [row], [firstRow], and [previousRow]. The field will be replaced with calculated values
+ * when the model is returned/retrieved. Formulas can be complex and error prone due to the mental model associated with using them with a DAO. Where
+ * your data is a function of the existing data within the object, consider using an enricher function instead.
+ * @param {function} enricher - a function that takes a model object as an only parameter, enriches it with other data and then returns it for use.
+ * @param {string} sequence - a named range for a single cell that contains a number that will be incremented as a sequenced ID for the data model.
+ * @param {{function}} richTextConverters - an map of field names to functions that can takes a field value as an only parameter and returns a RichTextValue object.
+ * @param {{string}} formulas - a map of field names to strings that define a sheet formula for use in all rows, for instance {"bill":"=[price][row]*[quantity][row]"}.
+ * @param {{DataValidation}} dataValidations - a map of field names to DataValidations that apply to the field.
+ * @return {object} a map of options for use in the createDao(...) and inferDao(...) functions.
+ */
+function buildOptions(enricher, sequence, richTextConverters, formulas, dataValidations) {
+  return {
+    "enricher": enricher,
+    "sequence": sequence,
+    "richTextConverters": richTextConverters,
+    "formulas": formulas,
+    "dataValidations": dataValidations
+  };
+}
+
+/**
+ * Create a new Data Access Object that infers the metadata from the data in the sheet. The first row in the sheet must be a header row. The start column
+ * will be inferred to be the first column from the left that has a header value. The end column will be inferred to be column before the first column
+ * after the start column that has no header value. Fields will be inferred to be the titles in the header row for each column changed to camel case.
+ * @param {Sheet} sheet - the sheet that contains the data for the Data Access Object.
+ * @param {string} primaryKey - the field to use as the primary key for the Data Access Object (defaults to first key found).
+ * @param {{object}} options - extra configuration options, documented by function Model.buildOptions(...).
+ * @param {string} startCol - the column to start looking for field names from (defaults to "A").
+ * @param {int} startRow - the row to use for field names (defaults to 1).
+ * @return {Dao} a data access object that encapsulates the data access functions based on the inferred keys and start column.
+ */
+function inferDao(sheet, primaryKey, options, startCol="A", startRow=1) {
+  DaoLogger.trace("Running inferDao(sheet:'%s', pk:'%s', startCol:'%s', startRow:'%s')", sheet.getName(), primaryKey, startCol, startRow);
+  DaoLogger.trace(options);
+  const safeOptions = options ? options : {};
+  const values = sheet.getRange(`${startRow}:${startRow}`).getValues();
+  const metadata = inferMetadata_(values, startCol);
+  const pk = primaryKey ? primaryKey : metadata.keys[0].slice(0);
+  DaoLogger.trace(metadata);
+  return createDao(sheet, metadata.keys, pk, metadata.startCol, startRow+1, safeOptions);
+}
 
 /**
  * Allows for configuration of the Log library.
@@ -49,7 +108,42 @@ function getUrlConverter(calcUrlFn) {
  * Helper functions
  */
 
-/**
+/*
+ * Looks at a single row dataset of values and tries to infer the startCol and keys properties of a DAO.
+ * The logic will start at the column reference provided and look left until it finds the first populated
+ * cell. It will then continue until it finds the next empty cell.
+ */
+function inferMetadata_(values, col) {
+  //where do we start having header values
+  let cols = getColumnReferences_();
+  let startCol = cols.indexOf(col);
+  startCol = startCol < 0 ? 0 : startCol;
+  DaoLogger.debug("Start Col = '%s'", startCol);
+
+  //todo - handle start row as well
+  while (values[0][startCol] === '') startCol++;
+
+  //where do we end having header values
+  let endCol = startCol;
+  while (values[0][endCol] !== '' && values[0].length >= endCol) endCol++;
+  
+  //the metadata object to return
+  let metadata = {};
+
+  //work out the start column reference
+  metadata["startCol"] = cols[startCol];
+
+  //get the header values from the header row
+  let keys = values[0].slice(startCol, endCol);
+
+  //convert the header values to camel case keys 
+  metadata["keys"] = keys.map(key => toCamelCase_(key));
+
+  //return the inferred metadata
+  return metadata;
+}
+
+/*
  * Converts the model object into an array of values in the order of the defined keys.
  */
 function getModelValues_(model, keys) {
@@ -58,14 +152,14 @@ function getModelValues_(model, keys) {
   return values;
 }
 
-/**
+/*
  * Get's the first empty row below the cell at the column and row provided.
  */
 function getFirstEmptyRow_(sheet) {
   return sheet.getDataRange().getLastRow() + 1;
 }
 
-/**
+/*
  * Looks for a unique value below the cell at the column and row provided.
  */
 function findKey_(sheet, key, col, row) {
@@ -90,7 +184,7 @@ function findKey_(sheet, key, col, row) {
   else throw new Error(`Could not find '${key}'`)
 }
 
-/**
+/*
  * Takes a named range of a single cell and adds the increment and returns the value. The new value
  * is saved back to the cell of named range.
  */
@@ -102,7 +196,7 @@ function incrementKey_(sequence, increment = 1) {
   return newValue;
 }
 
-/**
+/*
  * Creates a map of substitutes for the row values in a formula.
  */
 function buildSubstitutes_(row, startRow) {
@@ -113,7 +207,7 @@ function buildSubstitutes_(row, startRow) {
   };
 }
 
-/**
+/*
  * Process a string with a set of substitute replacements. This allows a string act as a template
  * which can be used in multiple contexts based on the substitutes provided.
  */
@@ -121,7 +215,7 @@ function processStringTemplate_(template, substitutes) {
   return Object.keys(substitutes).reduce((tmpl, k) => {return tmpl.replaceAll(k, substitutes[k])}, template);
 }
 
-/**
+/*
  * Converts a provided string to standard camel case, with the first letter in lowerCase.
  */
 function toCamelCase_(str) {
@@ -132,7 +226,7 @@ function toCamelCase_(str) {
   }).join('');
 }
 
-/**
+/*
  * Gets the columns for a set of keys to be used as substitution in formula templates.
  */
 function getKeyColMap_(startCol, keys) {
@@ -142,7 +236,7 @@ function getKeyColMap_(startCol, keys) {
   return keys.reduce((refsByKey, key, i) => {return Object.assign(refsByKey, {[key]: cols[i]})}, {});
 }
 
-/**
+/*
  * Calculates the last column based on the first column and a length.
  */
 function calculateEndColumn_(startCol, length) {
@@ -154,7 +248,7 @@ function calculateEndColumn_(startCol, length) {
   return cols[endIndex]; 
 }
 
-/**
+/*
  * Gets an array of every column reference from "A" through to "ZZ".
  */
 function getColumnReferences_() {

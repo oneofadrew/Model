@@ -2,7 +2,7 @@
 // Copyright ⓒ 2024 Drew Harding
 // All rights reserved.
 //---------------------------------------------------------------------------------------
-/**
+/*
  * A Search wraps up a series of search terms to allow searches across multiple fields
  * of a model at once. The Search class allows for new terms to be added to it afterwards
  * so it allows it to be passed between functions to build up a set of terms via composition.
