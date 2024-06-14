@@ -293,5 +293,5 @@ function testToCamelCase_() {
 /**
  * Adhoc testing
  */
-function test() {
+function test_() {
 }
