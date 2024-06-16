@@ -67,7 +67,7 @@ function buildOptions(enricher, sequences, richTextConverters, formulas, dataVal
  */
 function inferDao(sheet, primaryKey, options, startCol="A", startRow=1) {
   DaoLogger.trace("Running inferDao(sheet:'%s', pk:'%s', startCol:'%s', startRow:'%s')", sheet.getName(), primaryKey, startCol, startRow);
-  DaoLogger.trace(options);
+  if (DaoLogger.isTraceEnabled()) DaoLogger.trace("Using options %s", JSON.stringify(options));
   const safeOptions = options ? options : {};
   const values = sheet.getRange(`${startRow}:${startRow}`).getValues();
   const metadata = inferMetadata_(values, startCol);

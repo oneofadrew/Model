@@ -110,11 +110,11 @@ function testCreateDaoHappyPath_() {
   const primaryKey = "key2";
   const sheet = "mySheet";
   const enricher = (m) => {return m;};
-  const sequence = "mySequence";
+  const sequences = {"key2":"mySequence"};
   const converter = () => {return true;};
   const converters = {"key4": converter};
   const formulas = {"key2" : "=[key1][row]+[key3][row]", "key4" : "$A$1 + [key4][previousRow] + [key3][row]"};
-  const options = buildOptions(enricher, sequence, converters, formulas);
+  const options = buildOptions(enricher, sequences, converters, formulas);
   const dao = createDao(sheet, keys, primaryKey, "G", 3, options);
   Test.isEqual(dao.SHEET, sheet);
   Test.isEqual(dao.KEYS, keys);
@@ -127,7 +127,7 @@ function testCreateDaoHappyPath_() {
   Test.isEqual(dao.KEY_COLS_MAP, {"key1": "G", "key2": "H", "key3": "I", "key4": "J"});
   Test.isEqual(dao.END_COL, "J");
   Test.isEqual(dao.ENRICHER, enricher);
-  Test.isEqual(dao.SEQUENCE, sequence);
+  Test.isEqual(dao.SEQUENCES, sequences);
   Test.isEqual(Object.keys(dao.CONVERTERS).length, 1);
   Test.isEqual(dao.CONVERTERS["key4"], converter);
   Test.isTrue(dao.CONVERTERS["key4"]());
@@ -285,6 +285,7 @@ function testToCamelCase_() {
   Test.isEqual(toCamelCase_("Equipment className"), 'equipmentClassname');
   Test.isEqual(toCamelCase_("equipment class name"), 'equipmentClassName');
   Test.isEqual(toCamelCase_("Equipment Class Name"), 'equipmentClassName');
+  Test.isEqual(toCamelCase_("2024 Apr 03"), '2024Apr03');
   Test.isEqual(toCamelCase_("DASS 21"), 'dass21');
 }
 

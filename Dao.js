@@ -37,7 +37,6 @@ class Dao_ {
     Object.keys(this.SEQUENCES).forEach(key => {
       if (keys.indexOf(key)<0) throw new Error(`Key '${key}' in sequences does not exist in keys [${keys}]`);
     });
-    this.PK_SEQUENCE = this.SEQUENCES[this.PK];
 
     this.CONVERTERS = safeOptions["richTextConverters"] ? safeOptions["richTextConverters"] : {};
     Object.keys(this.CONVERTERS).forEach(key => {
@@ -110,23 +109,29 @@ class Dao_ {
    * and create if it doesn't.
    */
   save(model) {
-    DaoLogger.trace(`Saving model`);
-    // flatten to model values for the record
-    let values = [getModelValues_(model, this.KEYS)];
+    if (DaoLogger.isTraceEnabled()) {
+      DaoLogger.trace("Saving model %s", JSON.stringify(model));
+    }
 
-    // get the key value
-    let keyValue = values[0][this.PKI];
-    DaoLogger.trace(`Saving model with key '%s'`, keyValue);
-    
     // grab the document lock for read and write consistency
     DaoLogger.trace(`Grab the document lock`);
     let lock = LockService.getDocumentLock();
     lock.waitLock(10000);
 
-    //if this requires a generated key and the key value isn't set, generate the key
-    keyValue = keyValue || !this.PK_SEQUENCE ? keyValue : incrementKey_(this.PK_SEQUENCE);
-    model[this.KEYS[this.PKI]] = keyValue;
-    values[0][this.PKI] = keyValue;
+    // generate sequences if necessary
+    DaoLogger.trace(`Processing sequences %s`, JSON.stringify(this.SEQUENCES));
+    Object.keys(this.SEQUENCES).forEach(key => {
+      DaoLogger.trace(`Increment the sequence for %s`, key);
+      if (!model[key]) model[key] = incrementKey_(this.SEQUENCES[key]);
+    });
+
+    // flatten to model values for the record
+    let values = [getModelValues_(model, this.KEYS)];
+
+    // get the key value
+    let keyValue = values[0][this.PKI];
+    if (!keyValue) {throw new Error(`Could find a value for primary key ${this.PK} in the model ${JSON.stringify(model)}`)};
+    DaoLogger.trace(`Saving model with key '%s'`, keyValue);
 
     // try to find a record to update based on the key, otherwise we'll create a new record
     let row;
@@ -202,11 +207,42 @@ class Dao_ {
    */
   bulkSave(models) {
     DaoLogger.debug(`Starting the bulk save by flattening models to values.`);
+
+    //check the ones to create don't already exist
+    for (let model of models)
+      if (!model[this.PK] && model["row"]) throw new Error(`The model doesn't exist but has a value for its row property present (${model["row"]})`);
+
     // flatten the models to a 2D array
     const values = models.map(model => getModelValues_(model, this.KEYS));
 
+    // process all the sequence fields
+    const sequenceFields = Object.keys(this.SEQUENCES);
+    if (sequenceFields.length > 0) {
+      // create the counter objects
+      let sequenceCounts = {};
+
+      for (let field of sequenceFields) sequenceCounts[field] = {"index": this.KEYS.indexOf(field), "count": 0};
+      
+      // count the number of sequences to generate for each of the fields
+      for (let record of values)
+        for (let field of sequenceFields)
+          // if the record doesn't have the sequence field then count it for incrementing the sequence,
+          if (!record[sequenceCounts[field]["index"]]) sequenceCounts[field]["count"]++;
+
+      // generate the sequences
+      for (let field of sequenceFields)
+        if (sequenceCounts[field]["count"])
+          //the next counter = the last value for the key after incrementing - count to increment + 1
+          sequenceCounts[field]["next"] = incrementKey_(this.SEQUENCES[field], sequenceCounts[field]["count"]) - sequenceCounts[field]["count"] + 1;
+
+      // populate the sequences in the records
+      for (let record of values)
+        for (let field of sequenceFields)
+          // if the sequence field is empty add the next value into it and increment the next value
+          if (!record[sequenceCounts[field]["index"]]) record[sequenceCounts[field]["index"]] = sequenceCounts[field]["next"]++;
+    }
+
     //todo - check for duplicate keys
-    if (!this.PK_SEQUENCE) {}
 
     // get the lock - we need to do this before any reads to guarantee both read and write consistency
     DaoLogger.debug(`Grab the document lock.`);
@@ -227,6 +263,13 @@ class Dao_ {
     let primaryKeys = [];
     for (let i=0;i<existingKeys.length;i++) primaryKeys[primaryKeys.length] = existingKeys[i][0];
 
+    /*
+    for (let model of models) {
+      if (model["row"] && model["row"] !== primaryKeys.indexOf(model[this.PK])+this.START_ROW)
+        throw new Error(`The row of the model (${model["row"]}) did not match the row of the model with primary key '${model[this.PK]}' (${primaryKeys.indexOf(model[this.PK])+this.START_ROW})`);
+    };
+    */
+
     //sort the models into those to update and those to create
     DaoLogger.debug(`Sort the models into those to be updated and those to be created.`);
     let updatedValues = [];
@@ -234,6 +277,34 @@ class Dao_ {
     for (let i=0;i<values.length;i++) {
       if (primaryKeys.indexOf(values[i][this.PKI]) > -1) updatedValues[updatedValues.length] = values[i];
       else newValues[newValues.length] = values[i];
+    }
+
+    // check for new records that have a row attribute
+    let newRecordsByKey = {};
+    for (let newRecord of newValues) if (newRecord[this.PKI]) newRecordsByKey[newRecord[this.PKI]] = newRecord;
+
+    for (let model of models) {
+      const newRecord = model[this.PK] ? newRecordsByKey[model[this.PK]] : null;
+      if ((newRecord && model["row"]) || (!model[this.PK] && model["row"])) throw new Error(`The model doesn't exist but has a value for its row property present (${model["row"]})`);
+    }
+
+    /*
+    for (let newRecord of newValues) {
+      const key = newRecord[this.PKI];
+      const model = modelsByKey[key];
+      if (model && model["row"]) throw new Error(`The model doesn't exist but has a value for its row property present (${model["row"]})`);
+    }
+    */
+
+    // check for updated records where the wrong doesn't match the current row
+    let modelsByKey = {};
+    for (let model of models) if (model[this.PK]) modelsByKey[model[this.PK]] = model;
+
+    for (let updatedRecord of updatedValues) {
+      const key = updatedRecord[this.PKI];
+      const row = primaryKeys.indexOf(key) + this.START_ROW;
+      const model = modelsByKey[key];
+      if (model["row"] && model["row"] !== row) throw new Error(`The row of the model (${model["row"]}) did not match the row of the model with primary key '${key}' (${row})`);
     }
 
     //create the update batches based on contiguous rows
@@ -297,16 +368,6 @@ class Dao_ {
         DaoLogger.trace(`Set the rich text values for key '%s'.`);
         range.setRichTextValues(richTextValues);
       }
-    }
-
-    // if we need to create the keys then create them here
-    if (this.PK_SEQUENCE) {
-      DaoLogger.debug(`Get the next sequence values for models to create.`);
-      let lastKey = incrementKey_(this.PK_SEQUENCE, newValues.length);
-      newValues = newValues.map((modelValues, i) => {
-        modelValues[this.PKI] = lastKey - newValues.length + i + 1;
-        return modelValues;
-      });
     }
 
     // save the new records
