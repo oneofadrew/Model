@@ -6,7 +6,7 @@
  * A Data Access Object wraps up a set of functions to allow easily interactivity across a model
  */
 class Dao_ {
-  constructor(sheet, keys, primaryKey, startCol=A, startRow=2, options) {
+  constructor(sheet, keys, primaryKey, startCol, startRow, options) {
     DaoLogger.trace("keys:'%s', pk:'%s', startCol:'%s', startRow:'%s'", keys, primaryKey, startCol, startRow);
     const colRefs = getColumnReferences_();
     const safeOptions = options ? options : {};
@@ -14,8 +14,8 @@ class Dao_ {
     this.SHEET = sheet;
     this.KEYS = keys;
 
-    this.START_COL = startCol;
-    this.SCI = colRefs.indexOf(startCol);
+    this.START_COL = startCol ? startCol : "A";
+    this.SCI = colRefs.indexOf(this.START_COL);
 
     if (primaryKey && keys.indexOf(primaryKey) < 0) throw new Error(`Primary key '${primaryKey}' is not one of the keys to use: [${keys}]`);
 
@@ -25,10 +25,10 @@ class Dao_ {
     this.PKCI = colRefs.indexOf(this.PK_COL);
     DaoLogger.trace("PK Column '%s' found at column index '%s'", this.PK_COL, this.SCI+this.PKI);
 
-    this.START_ROW = startRow;
+    this.START_ROW = startRow ? startRow : 2;
 
     this.KEY_COLS_MAP = getKeyColMap_(this.START_COL, this.KEYS);
-    this.END_COL = calculateEndColumn_(startCol, keys.length);
+    this.END_COL = calculateEndColumn_(this.START_COL, keys.length);
     this.ECI = colRefs.indexOf(this.END_COL);
     
     this.ENRICHER = safeOptions["enricher"];
@@ -261,6 +261,8 @@ class Dao_ {
     //flatten the key from an array of arrays to an array
     DaoLogger.debug(`Process the keys to a single flat array.`);
     let primaryKeys = [];
+    //todo
+    //for (let i=0;i<existingKeys.length;i++) primaryKeys[primaryKeys.length] = existingKeys[i][0].getTime ? existingKeys[i][0].getTime() : existingKeys[i][0];
     for (let i=0;i<existingKeys.length;i++) primaryKeys[primaryKeys.length] = existingKeys[i][0];
 
     /*
@@ -274,7 +276,12 @@ class Dao_ {
     DaoLogger.debug(`Sort the models into those to be updated and those to be created.`);
     let updatedValues = [];
     let newValues = [];
+    //todo
+    //let pkValue = values[0].length;
     for (let i=0;i<values.length;i++) {
+      //todo
+      //values[i][pkValue] = values[i][this.PKI] && values[i][this.PKI].getTime ? values[i][this.PKI].getTime() : values[i][this.PKI];
+      //if (primaryKeys.indexOf(values[i][pkValue]) > -1) updatedValues[updatedValues.length] = values[i];
       if (primaryKeys.indexOf(values[i][this.PKI]) > -1) updatedValues[updatedValues.length] = values[i];
       else newValues[newValues.length] = values[i];
     }

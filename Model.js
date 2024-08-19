@@ -176,6 +176,8 @@ function findKey_(sheet, key, col, row) {
   let total = 0;
   ModelLogger.trace("Looking for key '%s'...", key);
   for (let i=row;i<values.length;i++) {
+    //todo
+    //if (values[i][col] === key || (values[i][col].getTime && values[i][col].getTime() === key.getTime())) {
     if (values[i][col] === key) {
       total++;
       if (first<0) first = i+1;
