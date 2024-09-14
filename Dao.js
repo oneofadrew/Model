@@ -17,7 +17,7 @@ class Dao_ {
     this.START_COL = startCol ? startCol : "A";
     this.SCI = colRefs.indexOf(this.START_COL);
 
-    if (primaryKey && keys.indexOf(primaryKey) < 0) throw new Error(`Primary key '${primaryKey}' is not one of the keys to use: [${keys}]`);
+    if (primaryKey && keys.indexOf(primaryKey) < 0) throw new Error(`Primary key '${primaryKey}' is not one of the keys available: [${keys}]`);
 
     this.PK = primaryKey ? primaryKey : keys[0];
     this.PKI = keys.indexOf(this.PK);
