@@ -17,7 +17,7 @@ class Dao_ {
     this.START_COL = startCol ? startCol : "A";
     this.SCI = colRefs.indexOf(this.START_COL);
 
-    if (primaryKey && keys.indexOf(primaryKey) < 0) throw new Error(`Primary key '${primaryKey}' is not one of the keys to use: [${keys}]`);
+    if (primaryKey && keys.indexOf(primaryKey) < 0) throw new Error(`Primary key '${primaryKey}' is not one of the keys available: [${keys}]`);
 
     this.PK = primaryKey ? primaryKey : keys[0];
     this.PKI = keys.indexOf(this.PK);
@@ -32,6 +32,10 @@ class Dao_ {
     this.ECI = colRefs.indexOf(this.END_COL);
     
     this.ENRICHER = safeOptions["enricher"];
+
+    this.MAX_LENGTH = safeOptions["maxLength"] ? safeOptions["maxLength"] : 0;
+    this.FINAL_ROW = this.MAX_LENGTH ? this.MAX_LENGTH + this.START_ROW - 1 : 0;
+    this.TABLE_RANGE = this.FINAL_ROW ? this.SHEET.getRange(`${this.START_COL}${this.START_ROW}:${this.END_COL}${this.FINAL_ROW}`) : null;
 
     this.SEQUENCES = safeOptions["sequences"] ? safeOptions["sequences"] : {};
     Object.keys(this.SEQUENCES).forEach(key => {
@@ -143,7 +147,7 @@ class Dao_ {
     } catch (e) {
       DaoLogger.trace(`Not found, creating a new one (error: %s).`, e.message);
       willCreate = true;
-      row = getFirstEmptyRow_(this.SHEET);
+      row = this.getFirstEmptyRow_();
       DaoLogger.trace(`Using first empty row: %s`, row);
     }
 
@@ -250,11 +254,11 @@ class Dao_ {
     lock.waitLock(10000);
     
     //get the first empty row
-    DaoLogger.debug(`Get the last row of the dataset.`);
-    const firstEmptyRow = getFirstEmptyRow_(this.SHEET);
+    DaoLogger.debug(`Get the last populated table row of the dataset.`);
+    const lastTableRow = this.findLastRow();
 
     //Get the existing keys from the sheet
-    const rangeRef = `${this.PK_COL}${this.START_ROW}:${this.PK_COL}${firstEmptyRow}`;
+    const rangeRef = `${this.PK_COL}${this.START_ROW}:${this.PK_COL}${lastTableRow}`;
     DaoLogger.debug(`Grabbing the values for the keys to the sheet from '%s'.`, rangeRef);
     const existingKeys = this.SHEET.getRange(rangeRef).getValues();
 
@@ -374,15 +378,19 @@ class Dao_ {
     if (newValues.length > 0) {
       DaoLogger.trace(`Saving '%s' new models - start by getting the range.`, newValues.length);
 
+      const lastNewRow = lastTableRow + newValues.length;
+      if (this.FINAL_ROW && lastNewRow > this.FINAL_ROW) {
+        DaoLogger.error(`There are no emtpy rows left. The maximum length is %s (row %s) and the %s models to create will push the table out of bounds to row %s.`, this.MAX_LENGTH, this.FINAL_ROW, newValues.length, lastNewRow);
+        throw new Error(`There are no emtpy rows left. The maximum length is ${this.MAX_LENGTH} (row ${this.FINAL_ROW}) and the ${newValues.length} models to create will push the table out of bounds to row ${lastNewRow}.`);
+      }
+
+      const firstEmptyRow = lastTableRow + 1;
       DaoLogger.trace(`Add in any data validations.`);
       for (let key in this.VALIDATIONS) {
         DaoLogger.trace(`Set the data validations for key '%s'.`, key);
         const range = this.SHEET.getRange(`${this.KEY_COLS_MAP[key]}${firstEmptyRow}:${this.KEY_COLS_MAP[key]}${firstEmptyRow+newValues.length-1}`);
         range.setDataValidation(this.VALIDATIONS[key]);
       }
-      
-      const rangeRef = `${this.START_COL}${firstEmptyRow}:${this.END_COL}${firstEmptyRow+newValues.length-1}`;
-      const newRange = this.SHEET.getRange(rangeRef);
 
       //add the formulas
       DaoLogger.trace(`Add in the formulas for the new values.`);
@@ -394,7 +402,9 @@ class Dao_ {
           newValues[i][kIndex] = processStringTemplate_(this.FORMULAS[key], subs);
         }
       }
-      DaoLogger.debug(`Saving the new models.`);
+      const rangeRef = `${this.START_COL}${firstEmptyRow}:${this.END_COL}${firstEmptyRow+newValues.length-1}`;
+      DaoLogger.debug(`Saving the new models into range ${rangeRef}.`);
+      const newRange = this.SHEET.getRange(rangeRef);
       newRange.setValues(newValues);
 
       //todo - add any rich text
@@ -424,20 +434,23 @@ class Dao_ {
     let lock = LockService.getDocumentLock();
     lock.waitLock(10000);
 
-    let titleRange;
-    let titles;
-    let formulas;
-    if (this.START_ROW > 0) {
-      DaoLogger.debug(`We don't start at row 1, so save everything above the start row.`);
-      titleRange = this.SHEET.getRange(`1:${this.START_ROW-1}`);
-      titles = titleRange.getValues();
-      formulas = titleRange.getFormulas();
-      for (let i=0;i<formulas.length;i++) for (let j=0;j<formulas[i].length;j++) titles[i][j] = formulas[i][j] ? formulas[i][j] : titles[i][j];
+    if (this.FINAL_ROW) {
+      this.TABLE_RANGE.clear({"contentsOnly": true, "formatsOnly": true, "validationsOnly": true}); 
+    } else {
+      let titleRange;
+      let titles;
+      if (this.START_ROW > 0) {
+        DaoLogger.debug(`We don't start at row 1, so save everything above the start row.`);
+        titleRange = this.SHEET.getRange(`1:${this.START_ROW-1}`);
+        titles = titleRange.getValues();
+        let formulas = titleRange.getFormulas();
+        for (let i=0;i<formulas.length;i++) for (let j=0;j<formulas[i].length;j++) titles[i][j] = formulas[i][j] ? formulas[i][j] : titles[i][j];
+      }
+
+      this.SHEET.getDataRange().clear({"contentsOnly": true, "formatsOnly": true, "validationsOnly": true});
+
+      if (this.START_ROW > 0) titleRange.setValues(titles)
     }
-
-    this.SHEET.getDataRange().clear({"contentsOnly": true, "formatsOnly": true, "validationsOnly": true});
-
-    if (this.START_ROW > 0) titleRange.setValues(titles)
 
     // and we are done
     DaoLogger.debug(`Flush and unlock.`);
@@ -449,7 +462,39 @@ class Dao_ {
    * Returns the last row of the model object table.
    */
   findLastRow() {
-    return getFirstEmptyRow_(this.SHEET) - 1;
+    const lastRow = this.SHEET.getDataRange().getLastRow();
+    DaoLogger.trace("The last row of the data range is %s and the final row configuration is %s", lastRow, this.FINAL_ROW);
+    if (!this.FINAL_ROW) {
+      DaoLogger.trace("No final row configured so just returning the last row.");
+      return lastRow;
+    }
+    if (this.FINAL_ROW && lastRow <= this.FINAL_ROW) {
+      DaoLogger.trace("There's a final row configured but the last row is less than or equal to it, so return the last row.");
+      return lastRow;
+    }
+    //if we made it this far then there is a final row and the data range is past it already In a "final row" scenario this is the
+    //more common outcome - the limit stops us from overwriting something further below the model data. This is nowhere near as fast
+    //as just getting the last row of the data range. Unfortunately that's one of the trade offs we make to have bound tables.
+    const rangeRef = `${this.PK_COL}${this.START_ROW}:${this.PK_COL}${this.FINAL_ROW}`;
+    DaoLogger.trace(`Get the primary key range ${rangeRef} to determine the last row`);
+    const existingKeys = this.SHEET.getRange(rangeRef).getValues();
+    for (let i=0; i<existingKeys.length; i++) {
+      const currentRow = this.START_ROW + i;
+      DaoLogger.trace(`Loop: ${i}, Key: '${existingKeys[i][0]}', Row: ${currentRow}, Final Row: ${this.FINAL_ROW}`);
+      if (!existingKeys[i][0]) return currentRow - 1;
+      if (currentRow === this.FINAL_ROW) return this.FINAL_ROW;
+    }
+    DaoLogger.warn("Can't think of a reason we should be able to get to this point in the code...");
+    return this.FINAL_ROW;
+  }
+
+/*
+ * Get's the first empty row below the cell at the column and row provided.
+ */
+  getFirstEmptyRow_() {
+    const lastRow = this.findLastRow();
+    if (lastRow === this.FINAL_ROW) throw new Error(`There are no emtpy rows left. The maximum length is ${this.MAX_LENGTH} and the final row ${this.FINAL_ROW} is already used.`);
+    return lastRow + 1;
   }
   
   /*
