@@ -176,7 +176,7 @@ function findKey_(sheet, key, col, row) {
   }
   ModelLogger.trace("Found %s records for key '%s' at row '%s'", total, key, first);
   if (total === 1) return first;
-  else throw new Error(`Could not find '${key}'`)
+  else throw new Error(`Could not find record with key'${key}'`)
 }
 
 /*
