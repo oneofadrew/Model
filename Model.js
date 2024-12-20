@@ -14,7 +14,6 @@ const ModelLogger = Log.newLog("model.util");
 const DaoLogger = Log.newLog("model.dao");
 const SearchLogger = Log.newLog("model.search");
 
-
 /**
  * Create a new Data Access Object from the properties provided. 
  * @param {Sheet} sheet - the sheet that contains the data for the Data Access Object.
@@ -43,14 +42,15 @@ function createDao(sheet, keys, primaryKey, startCol, startRow, options) {
  * @param {[string]} uniqueKeys - an array of field names that should remain unique across every instance of the model.
  * @return {object} a map of options for use in the createDao(...) and inferDao(...) functions.
  */
-function buildOptions(enricher, sequences, richTextConverters, formulas, dataValidations, uniqueKeys) {
+function buildOptions(enricher, sequences, richTextConverters, formulas, dataValidations, uniqueKeys, maxLength) {
   return {
     "enricher": enricher,
     "sequences": sequences,
     "richTextConverters": richTextConverters,
     "formulas": formulas,
     "dataValidations": dataValidations,
-    "uniqueKeys": uniqueKeys
+    "uniqueKeys": uniqueKeys,
+    "maxLength": maxLength
   };
 }
 
@@ -66,13 +66,13 @@ function buildOptions(enricher, sequences, richTextConverters, formulas, dataVal
  * @return {Dao} a data access object that encapsulates the data access functions based on the inferred keys and start column.
  */
 function inferDao(sheet, primaryKey, options, startCol="A", startRow=1) {
-  DaoLogger.trace("Running inferDao(sheet:'%s', pk:'%s', startCol:'%s', startRow:'%s')", sheet.getName(), primaryKey, startCol, startRow);
-  if (DaoLogger.isTraceEnabled()) DaoLogger.trace("Using options %s", JSON.stringify(options));
+  ModelLogger.trace("Running inferDao(sheet:'%s', pk:'%s', startCol:'%s', startRow:'%s')", sheet.getName(), primaryKey, startCol, startRow);
+  if (ModelLogger.isTraceEnabled()) ModelLogger.trace("Using options %s", JSON.stringify(options));
   const safeOptions = options ? options : {};
   const values = sheet.getRange(`${startRow}:${startRow}`).getValues();
   const metadata = inferMetadata_(values, startCol);
   const pk = primaryKey ? primaryKey : metadata.keys[0].slice(0);
-  DaoLogger.trace(metadata);
+  ModelLogger.trace(metadata);
   return createDao(sheet, metadata.keys, pk, metadata.startCol, startRow+1, safeOptions);
 }
 
@@ -81,9 +81,9 @@ function inferDao(sheet, primaryKey, options, startCol="A", startRow=1) {
  * Script ID: 13RAf81luI1DJwKXIeWvK2daYsTN2Rnl2IE1oY_j156tEnNaVaXdRlg9O
  * Code: https://github.com/oneofadrew/Log
  */
-function configureLog(config) {
+function configureLog(config, dumpConfig) {
   Log.setConfig(config);
-  Log.dumpConfig();
+  if (dumpConfig) Log.dumpConfig();
 }
 
 /*
@@ -120,7 +120,7 @@ function inferMetadata_(values, col) {
   let cols = getColumnReferences_();
   let startCol = cols.indexOf(col);
   startCol = startCol < 0 ? 0 : startCol;
-  DaoLogger.debug("Start Col = '%s'", startCol);
+  ModelLogger.debug("Start Col = '%s'", startCol);
 
   //todo - handle start row as well
   while (values[0][startCol] === '') startCol++;
@@ -152,13 +152,6 @@ function getModelValues_(model, keys) {
   let values = [];
   for (let i=0;i<keys.length;i++) values[values.length] = model[keys[i]];
   return values;
-}
-
-/*
- * Get's the first empty row below the cell at the column and row provided.
- */
-function getFirstEmptyRow_(sheet) {
-  return sheet.getDataRange().getLastRow() + 1;
 }
 
 /*
