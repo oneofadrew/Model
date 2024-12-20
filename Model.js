@@ -40,6 +40,7 @@ function createDao(sheet, keys, primaryKey, startCol, startRow, options) {
  * @param {{string}} formulas - a map of field names to strings that define a sheet formula for use in all rows, for instance {"bill":"=[price][row]*[quantity][row]"}.
  * @param {{DataValidation}} dataValidations - a map of field names to DataValidations that apply to the field.
  * @param {[string]} uniqueKeys - an array of field names that should remain unique across every instance of the model.
+ * @param {number} maxLength - the maximum number of rows the table can be. This created a bounded table.
  * @return {object} a map of options for use in the createDao(...) and inferDao(...) functions.
  */
 function buildOptions(enricher, sequences, richTextConverters, formulas, dataValidations, uniqueKeys, maxLength) {
