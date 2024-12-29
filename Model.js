@@ -215,7 +215,7 @@ function processStringTemplate_(template, substitutes) {
  * Converts a provided string to standard camel case, with the first letter in lowerCase.
  */
 function toCamelCase_(str) {
-  const words = str.trim().split(/\s+/);
+  const words = str.trim().split(/[^a-zA-Z\d]+/);
   return words.map((word, i) => {
     if (i === 0) return word.toLowerCase();
     return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
